@@ -152,22 +152,34 @@ To customize, edit `.claude/commands/inbox.md` with your MCP tool calls.
 
 1. Clone this repo into your Obsidian vault directory
 2. Install [Claude Code](https://claude.ai/claude-code) if you haven't
-3. Customize `CLAUDE.md` — replace the example context with your own (role, domains, tools)
-4. Customize `.claude/commands/inbox.md` if you use MCP servers
-5. Start capturing in `00-Inbox/` and run `/triage`
+3. Open the vault directory in Claude Code and run **`/setup`**
 
-### First Session Checklist
+The `/setup` command is an interactive walkthrough that will:
 
-- [ ] Dump 3-5 things into `00-Inbox/` (ideas, todos, notes from today)
-- [ ] Run `/triage` and watch Claude route them
-- [ ] Run `/loops` to see your open items
-- [ ] Run `/find-connections` to start building the graph
+- **Ask about you** — your role, domains, and tools — and customize `CLAUDE.md` to match
+- **Configure MCP connectors** — walk through connecting your calendar, email, CRM, task board, and docs (or skip for manual-only)
+- **Set up data type conventions** — how action items, patterns, people, projects, references, and meeting notes flow through the system
+- **Create starter content** — a project, a person, and a seed pattern from your answers
+- **Run a live demo** — creates a messy inbox note and triages it so you can see the system in action
 
-### Weekly Rhythm
+Everything the setup configures is just markdown files — you can edit any of it later.
 
-- **Daily**: Capture to inbox, `/triage` as needed, `/inbox` once for external context
-- **As needed**: `/loops` to check open items, `/distill` after learning something new
-- **Weekly**: `/review` for the metacognition pass
+### After Setup
+
+Your daily rhythm:
+- **Capture** to `00-Inbox/` throughout the day (fast, messy, no formatting needed)
+- **`/inbox`** once to pull from connected tools (if configured)
+- **`/triage`** to route and process inbox notes
+- **`/loops`** to check open items
+
+Your weekly rhythm:
+- **`/review`** — the metacognition pass (what changed, what's emerging, what's orphaned)
+
+When you learn something:
+- **`/distill`** — extract patterns from any raw input
+
+Maintenance:
+- **`/find-connections`** — keep the knowledge graph connected
 
 ## Customization
 
