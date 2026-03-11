@@ -145,13 +145,26 @@ Walk through how each type of information flows through the system:
 - `/triage` will: extract patterns, pull out action items, route to the right domain, archive the rest
 - **Convention**: Don't self-edit at capture time. The system handles formatting.
 
-## Step 5: Customize `/conductor` (engineers only)
+## Step 5: Personalize the look
+
+Ask: **"Do you want to customize how your vault looks? I can set up a custom theme — accent color, font, dark/light mode. Or we can skip this and you can always just ask me to change the styling anytime while we're working together."**
+
+If they want to customize now, ask:
+1. **Dark or light mode?**
+2. **Accent color** — suggest a few (pink, blue, green, orange, purple, teal) or take any hex code / color name
+3. **Font** — Inter, JetBrains Mono, Lora, system default, or any Google Font
+
+Generate `.obsidian/snippets/personal-os.css` with their choices. Derive all secondary colors (hover, glow, borders, code bg, selection, scrollbar) from the single accent color. Tell them to enable it in Obsidian → Settings → Appearance → CSS snippets.
+
+If they skip, move on — they can ask "make my headers blue" or "switch to dark mode" at any point in any future conversation and you'll generate or update the CSS snippet then.
+
+## Step 6: Customize `/conductor` (engineers only)
 
 Ask if they're an engineer with git repos to scan.
 - If yes: ask for their workspace path and update `.claude/commands/conductor.md`
 - If no: let them know they can delete this command — it's optional
 
-## Step 6: Create starter content
+## Step 7: Create starter content
 
 Create 2-3 starter notes to demonstrate the system:
 
@@ -161,14 +174,14 @@ Create 2-3 starter notes to demonstrate the system:
 
 3. **A seed pattern** — ask: "What's one thing you've learned recently in your work that you'd want to remember?" Create a claim-style pattern note from their answer.
 
-## Step 7: Demo the workflow
+## Step 8: Demo the workflow
 
 1. Create a messy test note in `00-Inbox/` with a mix of content (an action item, a half-formed idea, and a person mention) based on what they've told you about their work.
 2. Run `/triage` on it so they can see the routing in action.
 3. Run `/loops` to show them the open item that was extracted.
 4. Run `/find-connections` to show how linking works.
 
-## Step 8: Summarize
+## Step 9: Summarize
 
 Tell them:
 
