@@ -1,102 +1,135 @@
-# Loops
+# loops-os
 
-**A local-first AI planner for Obsidian vaults.** Scans every `- [ ]` across your notes, infers priority from natural language, lays out a week canvas that routes around your calendar, and keeps the source of truth in markdown — no database, no cloud, no vendor.
+**A local-first AI planner for Obsidian vaults.** Scans every `- [ ]` across your notes, infers priority from natural language, and lays out a week canvas that routes around your calendar — all while keeping the source of truth in markdown. No database, no cloud, no vendor.
 
-Ships with the vault scaffolding Loops was built around (`vault-template/`) so you can try it against a working example before pointing it at your own vault.
-
-```
-loops-ui/          The Next.js 16 app. Triage / Plan / Focus / Reflect modes.
-vault-template/    The vault conventions + slash commands Loops reads.
-```
+---
 
 ## What it does
 
-- **Priority inference** — no tags, no labels. Reads natural language: "due Thursday", "blocking", "@waiting", "brainstorm" → sorted into 🔴 Now / 🟡 Soon / 🟢 Someday. Time-aware: "due Thursday" on a Wednesday is urgent, on a Monday it isn't.
-- **Triage queue** — card-by-card walk through new loops. Accept, park, drop, snooze. Keyboard-driven: `1`/`2`/`3` for priority, `H` to snooze, `S` to change stakeholder, `D` to open detail. The capacity gate blocks you from adding a ninth P1 before you drop one.
-- **Week canvas** — drag loops onto a weekday; timeblocks schedule around calendar events pulled from `06-Loops/calendar-today.json`. Overcommit is flagged, not allowed.
-- **Focus mode** — one loop at a time. Vim-style nav (`j`/`k`), `space` to close, `w` to pin. Everything else disappears.
-- **Reflect mode** — 30-day pressure heatmap, triage decision stats, weekly stakeholder summary draft (toggle via config).
-- **Markdown round-trip** — reads `- [ ]` from your notes, writes `- [x]` back when you close a loop. Your vault stays the source of truth. Close Loops, re-open in Obsidian, nothing is lost.
+- **Reads your whole vault.** Every unchecked `- [ ]` in any markdown file becomes a loop the system tracks.
+- **Infers priority from how you wrote it.** "Due Thursday" on a Wednesday is urgent. "Blocking" escalates. "@waiting" de-escalates. No tags, no labels.
+- **Schedules your week.** Drag a loop onto Tuesday; the system carves a timeblock that routes around the calendar events already on that day. Overcommit is flagged.
+- **Protects your attention.** Capacity gates block you from queueing a ninth P1 before you drop one. Configurable ceilings for your primary stakeholder (default 8) and your own priorities (default 5).
+- **Round-trips through markdown.** Close a loop in the app → the source markdown file's `- [ ]` flips to `- [x]`. Edit in Obsidian → the scanner picks up the change. Neither side is authoritative over the other; both point at the same files.
+- **Four focused modes.** Triage a new-loop queue card-by-card. Plan the week on a drag-drop canvas. Focus on one loop at a time, vim-style. Reflect on a 30-day pressure heatmap with a weekly stakeholder summary draft.
+
+---
 
 ## Quickstart
 
 The fastest path from a fresh clone:
 
 ```bash
-git clone <repo> && cd <repo>
+git clone git@github.com:annamarie-kelly/loops-os.git
+cd loops-os
 claude                  # open Claude Code in this directory
 /start                  # one-command onboarding
 ```
 
-`/start` installs dependencies, seeds example loops, spins up the dev server in the background, opens the browser, and offers to pull your inbox from any MCP sources you've wired up. See [`.claude/commands/start.md`](./.claude/commands/start.md) for exactly what it does.
+`/start` installs dependencies, seeds example loops, spins up the dev server, opens the browser, and offers to pull your inbox from any MCP sources you have wired. See [`.claude/commands/start.md`](./.claude/commands/start.md) for the exact sequence.
 
 **Manual path** — if you'd rather run the steps yourself:
 
 ```bash
 cd loops-ui
 npm install
-node scripts/seed-loops.mjs    # populate example loops in vault-template/
-npm run dev                    # open http://localhost:3000
+node scripts/seed-loops.mjs
+npm run dev                    # opens on http://localhost:3000
 ```
 
 Full setup walkthrough, first-session tour, and calendar-integration examples in [`loops-ui/README.md`](./loops-ui/README.md).
 
-## Architecture — three parts, decoupled
+---
 
-**`loops-ui/`** — a Next.js 16 + React 19 app. Pure file I/O; no database, no auth. Reads and writes under `06-Loops/` in whatever vault directory you point it at via `LOOPS_UI_VAULT_ROOT`.
+## Repo shape
 
-**`vault-template/`** — the Obsidian vault conventions Loops was built around. Folders (`00-Inbox`, `01-Building`, `02-Thinking`, `03-Working`, `04-Living`, `05-Relating`, `06-Loops`, `07-Archive`), a templates directory, and 11 Claude Code slash commands for capture / triage / distillation / pruning. Copy it into your own Obsidian vault, or just use it as the example Loops runs against out of the box.
+```
+loops-os/
+├── loops-ui/                 The Next.js 16 + React 19 app.
+│   ├── app/                  Routes (one page + 8 API endpoints)
+│   ├── components/           30 components, four-mode dashboard
+│   ├── lib/                  Pure TypeScript — types, config, gates,
+│   │                         events, scheduling, fuzzy-match
+│   └── scripts/              Vault scanners + CLI
+├── vault-template/           The vault scaffolding loops-os was built
+│   │                         around. Copy into your own Obsidian vault,
+│   │                         point the app at it, or use as the demo.
+│   ├── 00-Inbox/ … 07-Archive/
+│   ├── Templates/
+│   ├── .claude/commands/     11 vault-level slash commands
+│   └── CLAUDE.md             Two-axis memory model + vault conventions
+├── .claude/commands/start.md Repo-level /start command
+├── README.md                 This file
+└── AGENTS.md                 Architecture deep-dive + agent onboarding script
+```
 
-**The contract between them** — `06-Loops/loops.json`. The app reads it on every request. Any scanner that can produce the same shape (including the bundled `refresh-loops.mjs`, or your own MCP-driven `/inbox` pipeline) can feed Loops.
+Three decoupled parts:
 
-## The vault template (optional, but the interesting bit)
+- **`loops-ui/`** — the app. Pure file I/O, no database, no auth. Points at any directory matching the schema via `LOOPS_UI_VAULT_ROOT`.
+- **`vault-template/`** — the conventions + slash commands. Optional if you already have an Obsidian vault you want to use.
+- **`06-Loops/loops.json`** — the contract between them. Any scanner producing this shape can feed the app.
 
-The `vault-template/` directory ships a **two-axis memory model** for notes. Every note picks:
+For the architecture deep-dive — the planning algorithm, the event-sourced write layer, the stakeholder/capacity model, the priority-inference heuristics — see **[AGENTS.md](./AGENTS.md)**. It's also the guide for AI agents walking a new user through onboarding.
+
+---
+
+## The vault template
+
+`vault-template/` ships a **two-axis memory model** for notes. Every note picks:
 
 - A **domain** (folder): `01-Building`, `02-Thinking`, `03-Working`, `04-Living`, `05-Relating`.
-- A **memory type** (frontmatter `type:`): episodic (`episode`), semantic (`pattern` / `decision` / `failure` / `convention` / `essay` / `reference`), procedural (`playbook`).
+- A **memory type** (`type:` frontmatter): episodic (`episode`), semantic (`pattern` / `decision` / `failure` / `convention` / `essay` / `reference`), or procedural (`playbook`).
 
 One folder per note + one memory type = cross-axis retrieval. "Show me every failure across building and working." "Find all playbooks." "What episodes produced this pattern." A one-field change per note that unlocks compound knowledge retrieval.
 
-The eleven slash commands that come with the template:
+Eleven slash commands come with the template:
 
 | Command | What it does |
 |---|---|
-| `/setup` | Interactive walkthrough to customize the vault to your role, domains, and tools |
-| `/inbox` | Pull external context (calendar, CRM, task board) from MCP sources into the inbox |
-| `/triage` | Route inbox notes to the right domain + memory type; delegate investigations to background agents |
+| `/setup` | Interactive walkthrough to customize the vault to your role and tools |
+| `/inbox` | Pull external context (calendar, CRM, task board) via MCP into the inbox |
+| `/triage` | Route inbox notes to the right domain + memory type |
 | `/distill` | Classify raw input by memory type and create properly-typed notes |
-| `/loops` | Terminal-friendly priority-sorted snapshot of every open `- [ ]` |
-| `/commitments` | Relationship view of the same data — what you owe people, what they owe you |
+| `/loops` | Terminal snapshot of every open `- [ ]`, priority-sorted |
+| `/commitments` | Relationship view: what you owe people, what they owe you |
 | `/find-connections` | Surface orphaned notes, suggest missing `[[wikilinks]]` |
 | `/conductor` | Scan git worktrees for in-progress work |
-| `/reindex` | Regenerate `_patterns.md` / `_episodes.md` / `_playbooks.md` from frontmatter |
-| `/prune` | Archive notes whose `shelf-life` has expired (14 days tactical / 30 days observational) |
+| `/reindex` | Regenerate per-folder `_patterns.md` / `_episodes.md` / `_playbooks.md` |
+| `/prune` | Archive notes whose `shelf-life` has expired |
 | `/review` | Weekly metacognition — what changed, what's emerging, what's orphaned |
 
-See [`vault-template/CLAUDE.md`](./vault-template/CLAUDE.md) for the full vault conventions, frontmatter schema, and record-type guidance.
+See [`vault-template/CLAUDE.md`](./vault-template/CLAUDE.md) for the full vault conventions and [`vault-template/README.md`](./vault-template/README.md) for three ways to adopt the template (copy in, point at your own, demo as-is).
+
+---
 
 ## Point at your own vault
 
-Already have an Obsidian vault? Point Loops at it:
+Already have an Obsidian vault?
 
 ```bash
 export LOOPS_UI_VAULT_ROOT=/absolute/path/to/your/vault
-cd loops-ui
-npm run dev
+cd loops-ui && npm run dev
 ```
 
-The only hard requirement is a `06-Loops/` directory for the ledger (auto-created on first run). The folder conventions above are the default scan set, but any folders you want scanned can be listed in [`loops-ui/loops.config.json`](./loops-ui/loops.config.json) under `vault.scanFolders`.
+The only hard requirement is a `06-Loops/` directory for the ledger (auto-created on first run). The folder conventions above are the scanner's defaults, but any folders you want scanned can be listed in [`loops-ui/loops.config.json`](./loops-ui/loops.config.json) under `vault.scanFolders`.
+
+---
 
 ## Configurable
 
-[`loops-ui/loops.config.json`](./loops-ui/loops.config.json) controls the primary stakeholder (name, tag, capacity cap, weekly summary), the `P1:self` capacity cap, flat priority caps, scanner stakeholder keywords, and subgroup→work-mode hints. No code edits required to retarget.
+[`loops-ui/loops.config.json`](./loops-ui/loops.config.json) controls the primary stakeholder (name, tag, capacity cap, weekly summary), the `P1:self` capacity cap, flat priority caps, scanner keywords, and subgroup→work-mode hints. No code edits required to retarget the app at a new person.
+
+See the stakeholder/capacity model deep-dive in [AGENTS.md](./AGENTS.md#5-the-stakeholder--capacity-model) for what each knob does and how the three coupled behaviors (capacity gate, weekly summary, stale flags) interact.
+
+---
 
 ## What's deliberately unfinished
 
-- **No calibrated-from-history time estimation.** Estimation is a static `difficulty → minutes` lookup. `doneAt` is recorded but not yet fed back to calibrate. A good next iteration: prompt on close for actual duration, recompute the table from history.
+- **No calibrated-from-history time estimation.** Estimation is a static `difficulty → minutes` lookup. `doneAt` is recorded but not yet fed back to calibrate.
 - **No Linear / Jira auto-sync.** `linear_ticket_id` exists as an optional display field; wire your own sync to populate it.
 - **No unit tests.** Every mutation routes through `applyEventToDisk` which is testable; no `.test.ts` files ship yet.
+
+---
 
 ## License
 
