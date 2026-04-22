@@ -20,9 +20,20 @@ vault-template/    The vault conventions + slash commands Loops reads.
 
 ## Quickstart
 
+The fastest path from a fresh clone:
+
 ```bash
-git clone <repo>
-cd <repo>/loops-ui
+git clone <repo> && cd <repo>
+claude                  # open Claude Code in this directory
+/start                  # one-command onboarding
+```
+
+`/start` installs dependencies, seeds example loops, spins up the dev server in the background, opens the browser, and offers to pull your inbox from any MCP sources you've wired up. See [`.claude/commands/start.md`](./.claude/commands/start.md) for exactly what it does.
+
+**Manual path** — if you'd rather run the steps yourself:
+
+```bash
+cd loops-ui
 npm install
 node scripts/seed-loops.mjs    # populate example loops in vault-template/
 npm run dev                    # open http://localhost:3000
