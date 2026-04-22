@@ -23,7 +23,7 @@ Bring a freshly-cloned `loops-os` repo from zero to "server running, ready to tr
    ```bash
    cd loops-ui && npm run dev
    ```
-   Then use the Monitor tool to wait for the "Ready" signal in stdout (timeout 30s). Capture the URL from the output (typically `http://localhost:3000`; may be a different port if 3000 is taken).
+   Then use the Monitor tool to wait for the "Ready" signal in stdout (timeout 30s). Capture the URL from the output (typically `http://localhost:3456`; may be a different port if 3456 is taken).
 
 4. **Open the browser.** Run `open <url>` (macOS) or `xdg-open <url>` (Linux) or print the URL for the user to click. Do this even if `open` fails — the URL should be visible either way.
 
@@ -42,7 +42,7 @@ Bring a freshly-cloned `loops-os` repo from zero to "server running, ready to tr
 
 ## Stopping the server
 
-If the user wants to stop the server, they can Ctrl-C the background task or ask you to kill the process on the port (`kill $(lsof -ti:3000)`).
+If the user wants to stop the server, they can Ctrl-C the background task or ask you to kill the process on the port (`kill $(lsof -ti:3456)`).
 
 ## Not doing
 

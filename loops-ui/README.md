@@ -93,12 +93,12 @@ npm run refresh-loops
 
 ```bash
 npm run dev
-open http://localhost:3000
+open http://localhost:3456
 ```
 
 ## First session: a 10-minute tour
 
-After `npm run dev`, open `http://localhost:3000`. You'll land in **Focus mode** with the seeded example loops already indexed. Here's the recommended first pass.
+After `npm run dev`, open `http://localhost:3456`. You'll land in **Focus mode** with the seeded example loops already indexed. Here's the recommended first pass.
 
 The top header has four mode tabs: **Focus · Triage · Plan · Reflect**. Each is a different lens on the same `06-Loops/loops.json`. Click to switch. There's also a hidden **Backlog** and **Someday** toggle on the header's right side.
 

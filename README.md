@@ -34,7 +34,7 @@ claude                  # open Claude Code in this directory
 cd loops-ui
 npm install
 node scripts/seed-loops.mjs
-npm run dev                    # opens on http://localhost:3000
+npm run dev                    # opens on http://localhost:3456
 ```
 
 Full setup walkthrough, first-session tour, and calendar-integration examples in [`loops-ui/README.md`](./loops-ui/README.md).
