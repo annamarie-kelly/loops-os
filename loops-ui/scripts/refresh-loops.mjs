@@ -44,15 +44,17 @@ const LOOPS_JSON = path.join(VAULT, '06-Loops/loops.json');
 
 const SCAN_DIRS = [
   '00-Inbox',
-  '01-Building',
+  '01-Creating',
   '02-Thinking',
-  '03-Working',
-  '04-Living',
-  '05-Relating',
+  '03-Living',
+  '04-Relating',
+  'inbox',
 ];
 const SKIP_SEGMENTS = new Set([
   'Templates',
+  'templates',
   'assets',
+  '05-Archive',
   '07-Archive',
   '06-Loops',
   '.claude',
@@ -246,17 +248,26 @@ function classifyWorkMode(title, subGroup) {
   return 'unsorted';
 }
 
-function domainFromFile(rel) {
+function domainFromFile(rel, text) {
+  const lower = (rel + ' ' + (text || '')).toLowerCase();
+
+  // Keyword-based: check text + file path for domain signals
+  if (/\b(caligo|ethereal|ceramics|clay|kiln|glaze|studio|rumination)\b/.test(lower))
+    return 'ethereal caligo';
+  if (/\b(oasis|digital.oasis|sonar|pipeline|extraction|embedding|tidemark|dave|stakeholder|sprint|standup|jira|linear|slack|deploy|prod)\b/.test(lower))
+    return 'oasis';
+
+  // Folder-based fallback
   const seg = rel.split('/')[0];
   return (
     {
-      '00-Inbox': 'working',
-      '01-Building': 'building',
-      '02-Thinking': 'thinking',
-      '03-Working': 'working',
-      '04-Living': 'living',
-      '05-Relating': 'relating',
-    }[seg] ?? 'working'
+      '03-Living': 'personal',
+      '04-Relating': 'personal',
+      '00-Inbox': 'personal',
+      '01-Creating': 'ethereal caligo',
+      '02-Thinking': 'oasis',
+      'inbox': 'oasis',
+    }[seg] ?? 'personal'
   );
 }
 
@@ -323,7 +334,7 @@ function scanFile(absPath, relPath) {
       difficulty,
       timeEstimateMinutes,
       subGroup,
-      domain: domainFromFile(relPath),
+      domain: domainFromFile(relPath, rawText),
       sourceFile: relPath,
       sourceLine: i + 1,
       workMode,

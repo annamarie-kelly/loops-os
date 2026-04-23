@@ -3,21 +3,21 @@
   "vault": {
     "scanFolders": [
       "00-Inbox",
-      "01-Building",
+      "01-Creating",
       "02-Thinking",
-      "03-Working",
-      "04-Living",
-      "05-Relating"
+      "03-Living",
+      "04-Relating",
+      "inbox"
     ],
     "inboxFile": "00-Inbox/manual-loops.md",
     "adoptedFile": "00-Inbox/adopted.md",
     "closeOutsFile": "00-Inbox/close-outs.md"
   },
   "stakeholder": {
-    "name": "Stakeholder",
-    "tag": "Stakeholder",
+    "name": "",
+    "tag": "",
     "capacityMax": 8,
-    "weeklySummary": true,
+    "weeklySummary": false,
     "staleDays": 5
   },
   "self": {
@@ -29,9 +29,15 @@
   },
   "scannerStakeholders": [],
   "subgroupHints": [
-    { "match": "sanity",  "mode": "design" },
-    { "match": "pattern", "mode": "design" },
-    { "match": "review",  "mode": "communicate" },
-    { "match": "schedule", "mode": "communicate" }
+    { "match": "ceramics", "mode": "build" },
+    { "match": "oasis",    "mode": "build" },
+    { "match": "digital-oasis", "mode": "build" },
+    { "match": "writing",  "mode": "design" },
+    { "match": "substack", "mode": "design" },
+    { "match": "pattern",  "mode": "design" },
+    { "match": "review",   "mode": "communicate" },
+    { "match": "schedule", "mode": "communicate" },
+    { "match": "health",   "mode": "ops" },
+    { "match": "errand",   "mode": "ops" }
   ]
 }

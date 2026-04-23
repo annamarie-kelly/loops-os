@@ -54,6 +54,7 @@ export function DetailDrawer({
   onSplitBlock,
   onRemoveBlock,
   onCreateFollowThrough,
+  onSwitchToDesign,
   variant = 'overlay',
 }: {
   loop: Loop | null;
@@ -78,6 +79,7 @@ export function DetailDrawer({
     sourceLoop: Loop;
     artifact: string;
   }) => Promise<void> | void;
+  onSwitchToDesign?: () => void;
   // overlay = fixed right drawer with scrim (default, used by Plan/Triage)
   // inline  = flows as a regular block element (used by FocusMode center)
   variant?: 'overlay' | 'inline';
@@ -678,9 +680,42 @@ export function DetailDrawer({
                 </button>
               </>
             )}
+            {!isDone && (
+              <button
+                onClick={async () => {
+                  // Scaffold a drafting spec from this loop
+                  const res = await fetch('/api/vault/specs/scaffold', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      loopTitle: loop.text,
+                      loopContext: loop.notes?.map((n) => n.text).filter(Boolean).join('\n') || undefined,
+                    }),
+                  });
+                  // Update the loop with a note regardless of scaffold result
+                  await onUpdateLoop(loop.id, {
+                    status: 'someday' as Loop['status'],
+                    notes: [
+                      ...(loop.notes ?? []),
+                      {
+                        id: `ns-${Date.now()}`,
+                        createdAt: new Date().toISOString(),
+                        text: `Moved to Design Bench — ${res.ok ? 'spec created' : 'needs specification'}`,
+                        system: true,
+                      },
+                    ],
+                  });
+                  onSwitchToDesign?.();
+                }}
+                className="px-3 py-1.5 rounded-md bg-transparent border-[0.5px] border-edge text-ink-soft hover:border-[var(--tan)] hover:bg-tan-fill hover:text-tan-text text-[12px] transition-colors"
+                title="This task needs a spec before building"
+              >
+                Needs spec
+              </button>
+            )}
             <a
               href={obsidianUrl}
-              className={`${isDone ? 'flex-1' : 'flex-1'} px-3 py-1.5 rounded-md bg-transparent border-[0.5px] border-edge text-ink-soft hover:border-[var(--mauve)] hover:bg-mauve-fill hover:text-mauve-text text-[12px] text-center transition-colors`}
+              className={`${isDone ? 'flex-1' : ''} px-3 py-1.5 rounded-md bg-transparent border-[0.5px] border-edge text-ink-soft hover:border-[var(--mauve)] hover:bg-mauve-fill hover:text-mauve-text text-[12px] text-center transition-colors`}
             >
               Obsidian ↗
             </a>

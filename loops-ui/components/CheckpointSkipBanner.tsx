@@ -19,12 +19,13 @@ import {
 
 const SKIP_HOUR = 16; // 4pm local — matches CheckpointModal
 
-type Pressure = 'chose' | 'reactive' | 'task_monkey';
+type Pressure = 'building' | 'improving' | 'fixing' | 'supporting';
 
 const PRESSURE_OPTIONS: { key: Pressure; label: string; accent: string }[] = [
-  { key: 'chose', label: 'chose', accent: 'var(--sage)' },
-  { key: 'reactive', label: 'reactive', accent: 'var(--tan)' },
-  { key: 'task_monkey', label: 'task-monkey', accent: 'var(--rose)' },
+  { key: 'building', label: 'building', accent: 'var(--sage)' },
+  { key: 'improving', label: 'improving', accent: 'var(--mauve)' },
+  { key: 'fixing', label: 'fixing', accent: 'var(--tan)' },
+  { key: 'supporting', label: 'supporting', accent: 'var(--rose)' },
 ];
 
 function yesterdayLocalDate(reference: Date): string {
@@ -135,6 +136,8 @@ export function CheckpointSkipBanner() {
       JSON.stringify(all),
     );
     window.localStorage.setItem('loops-ui:tend:checkpoint_force_open', today);
+    // Clear any stale checkpoint lock so the modal can always open.
+    window.localStorage.removeItem('loops-ui:tend:checkpoint_lock');
     // Let the auto-skip effect know we already logged a skip for today
     // so it doesn't immediately re-mark and stack a duplicate.
     window.localStorage.setItem('loops-ui:tend:checkpoint_skip_logged', today);
@@ -165,7 +168,7 @@ export function CheckpointSkipBanner() {
       completed_at: new Date().toISOString(),
       skipped: false,
       loops_touched: [],
-      pressure,
+      pressure: [pressure],
       tomorrow_intent: [],
     };
     writeCheckpoint(cp);
@@ -197,7 +200,11 @@ export function CheckpointSkipBanner() {
       className="sticky top-0 z-[40] border-b border-[var(--rose)]/30 bg-rose-fill text-rose-text"
     >
       {showTodaySkip && (
-        <div className="px-5 py-1.5 flex items-center justify-between gap-4 text-[11px] border-b border-[var(--rose)]/20">
+        <button
+          type="button"
+          onClick={doItNow}
+          className="w-full px-5 py-1.5 flex items-center justify-between gap-4 text-[11px] border-b border-[var(--rose)]/20 hover:bg-rose-fill/80 transition-colors cursor-pointer text-left"
+        >
           <div className="flex items-center gap-2">
             <span
               className="w-[6px] h-[6px] rounded-full"
@@ -209,14 +216,10 @@ export function CheckpointSkipBanner() {
               No pressure read logged — tomorrow&rsquo;s badges will be blank.
             </span>
           </div>
-          <button
-            type="button"
-            onClick={doItNow}
-            className="underline underline-offset-2 hover:no-underline"
-          >
+          <span className="underline underline-offset-2 shrink-0">
             Do it now
-          </button>
-        </div>
+          </span>
+        </button>
       )}
       {yesterdayBackfillable && (
         <div className="px-5 py-1.5 flex items-center justify-between gap-4 text-[11px]">

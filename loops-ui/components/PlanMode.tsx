@@ -9,7 +9,7 @@
 // ratio. Double-click the handle to reset to the default 340px.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CalendarFile, Loop } from '@/lib/types';
+import type { CalendarFile, Loop, SpecDoc } from '@/lib/types';
 import { LoopDrawer } from './LoopDrawer';
 import { WeekCanvas } from './WeekCanvas';
 
@@ -20,6 +20,7 @@ const MAX_SIDEBAR_WIDTH = 520;
 
 export function PlanMode({
   loops,
+  specs,
   weekBlocks,
   committedMinutes,
   calendar,
@@ -42,6 +43,7 @@ export function PlanMode({
   onQuickSchedule,
 }: {
   loops: Loop[];
+  specs?: SpecDoc[];
   weekBlocks: Loop[];
   committedMinutes: number;
   calendar: CalendarFile | null;
@@ -160,6 +162,7 @@ export function PlanMode({
           <>
             <LoopDrawer
               loops={loops}
+              specs={specs}
               selectedIds={selectedIds}
               focusedId={focusedId}
               editingId={editingId}

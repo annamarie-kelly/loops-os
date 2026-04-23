@@ -1,6 +1,6 @@
 export type Tier = 'now' | 'soon' | 'someday';
 
-export type Domain = 'building' | 'thinking' | 'working' | 'living' | 'relating';
+export type Domain = 'ethereal caligo' | 'personal' | 'oasis';
 
 export interface Timeblock {
   date: string; // ISO date "YYYY-MM-DD"
@@ -243,7 +243,7 @@ export interface Checkpoint {
   completed_at?: string;
   skipped: boolean;
   loops_touched: CheckpointTouchedLoop[];
-  pressure: 'chose' | 'reactive' | 'task_monkey' | null;
+  pressure: string[] | null;
   tomorrow_intent: string[];
 }
 
@@ -269,6 +269,53 @@ export type WorkMode =
   | 'research'
   | 'ops'
   | 'unsorted';
+
+// ─── Mission Control: Research Shelf ───────────────────────────────
+export type ResearchCategory =
+  | 'strategic-research'
+  | 'technical-investigation'
+  | 'foundational'
+  | 'design-research'
+  | 'artifact';
+
+export interface ResearchDoc {
+  id: string;
+  title: string;
+  summary: string;
+  filePath: string;
+  category: ResearchCategory;
+  createdAt: string;
+  updatedAt: string;
+  staleDays: number;
+  tags: string[];
+  type: string;
+  status: string;
+  sizeBytes: number;
+  openTaskCount: number;
+  favorite: boolean;
+  /** true for .html visual artifacts (rendered in iframe, not markdown) */
+  isHtml?: boolean;
+}
+
+// ─── Mission Control: Design Bench ─────────────────────────────────
+export type SpecStatus = 'drafting' | 'ready' | 'building' | 'shipped';
+
+export interface SpecDoc {
+  id: string;
+  title: string;
+  filePath: string;
+  status: SpecStatus;
+  effortEstimate: string | null;
+  openQuestions: string[];
+  createdAt: string;
+  updatedAt: string;
+  staleDays: number;
+  sourceResearch: string[];
+  linkedLoopCount: number;
+  sizeBytes: number;
+  /** true for .html visual artifacts (rendered in iframe, not markdown) */
+  isHtml?: boolean;
+}
 
 export interface LoopsFile {
   lastScanned: string;
@@ -407,11 +454,9 @@ export interface ContextFile {
 }
 
 export const DOMAIN_EMOJI: Record<Domain, string> = {
-  building: '🔨',
-  thinking: '🧠',
-  working: '📋',
-  living: '🏠',
-  relating: '👤',
+  'ethereal caligo': '⭐',
+  personal: '❤️',
+  oasis: '🌷',
 };
 
 // Tier ids stay 'now' | 'soon' | 'someday' so persisted state keeps

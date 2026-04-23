@@ -63,7 +63,7 @@ export function AdoptLoopDialog({
       difficulty: null,
       timeEstimateMinutes: null,
       subGroup: null,
-      domain: 'working',
+      domain: 'personal',
       source: { file: '00-Inbox/adopted.md', line: 1 },
       timeblocks: [],
       done: false,

@@ -1,7 +1,8 @@
 // Shared UI constants and tiny helpers for loops-ui.
 // Keep this file narrow: constants, formatters, small pure functions.
 
-import type { Loop, Tier, WorkMode } from './types';
+import type { Loop, Tier, WorkMode, Domain } from './types';
+import { DOMAIN_EMOJI } from './types';
 import { config } from './config';
 export type { WorkMode };
 
@@ -126,7 +127,7 @@ export function effectiveWorkMode(loop: Loop): WorkMode {
 
 // ─── Triage grouping helpers ─────────────────────────────────────────
 
-export type GroupDim = 'mode' | 'size' | 'person' | 'subgroup';
+export type GroupDim = 'mode' | 'size' | 'person' | 'subgroup' | 'domain';
 
 export interface TriageGroup {
   key: string;
@@ -202,6 +203,28 @@ export function buildGroups(loops: Loop[], dim: GroupDim): TriageGroup[] {
     })).filter((g) => g.loops.length > 0);
   }
 
+  if (dim === 'domain') {
+    const buckets = new Map<string, Loop[]>();
+    for (const l of loops) {
+      const d = l.domain || 'personal';
+      if (!buckets.has(d)) buckets.set(d, []);
+      buckets.get(d)!.push(l);
+    }
+    const order: string[] = Object.keys(DOMAIN_EMOJI);
+    const entries = [...buckets.entries()].sort((a, b) => {
+      const ai = order.indexOf(a[0]);
+      const bi = order.indexOf(b[0]);
+      return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
+    });
+    return entries
+      .filter(([, list]) => list.length > 0)
+      .map(([domain, list]) => ({
+        key: `domain-${domain}`,
+        label: `${DOMAIN_EMOJI[domain as Domain] ?? ''} ${domain.charAt(0).toUpperCase() + domain.slice(1)}`.trim(),
+        loops: list,
+      }));
+  }
+
   if (dim === 'person') {
     const buckets = new Map<string, Loop[]>();
     for (const l of loops) {
@@ -262,11 +285,10 @@ export function buildGroups(loops: Loop[], dim: GroupDim): TriageGroup[] {
   return groups.filter((g) => g.loops.length > 0);
 }
 
-export const DAY_START_MIN = 8 * 60; // 8am — grid floor (lets you SEE early/late creep)
-export const DAY_END_MIN = 19 * 60; // 7pm — grid ceiling
+export const DAY_START_MIN = 7 * 60; // 7am — grid floor
+export const DAY_END_MIN = 24 * 60; // midnight — grid ceiling
 // Healthy working-hours budget used for the capacity bar + "free time" math.
-// Grid shows 8a-7p so you can see overflow, but the bar is scored against 9-5.
-export const HEALTHY_DAY_MINUTES = 8 * 60; // 9am-5pm
+export const HEALTHY_DAY_MINUTES = 12 * 60; // 7am-7pm working window
 export const DAY_TOTAL_MIN = DAY_END_MIN - DAY_START_MIN;
 export const SLOT_MIN = 15;
 
@@ -277,14 +299,19 @@ export const LS_SOMEDAY_EXPANDED = 'loops-ui:someday-expanded';
 
 // UI modes. `triage` is the card-by-card intake queue for new loops;
 // `backlog` is the group-by-Mode/Size/Person/Subgroup canvas; `someday`
-// is the parked-items view.
+// is the parked-items view (kept for backwards compat).
+// SDLC pipeline modes: `research` surfaces vault research docs,
+// `design` shows agent specs, `ship` is deploy verification + visual differ.
 export type Mode =
   | 'focus'
   | 'plan'
   | 'triage'
   | 'backlog'
   | 'someday'
-  | 'reflect';
+  | 'reflect'
+  | 'research'
+  | 'design'
+  | 'ship';
 
 // Canonical stakeholder list for the flat priority model. Derived at
 // startup from loops.config.json so users can add their own colleagues
@@ -292,14 +319,14 @@ export type Mode =
 // "None" are always present: "Self" marks your own priorities,
 // "None" means "no single stakeholder; this is yours to weigh."
 export const STAKEHOLDERS: readonly string[] = [
-  config.stakeholder.name,
+  ...(config.stakeholder.name ? [config.stakeholder.name] : []),
   'Self',
   ...config.scannerStakeholders.map((s) => s.name),
   'None',
 ];
 export type Stakeholder = string;
 
-export type SortBy = 'default' | 'difficulty' | 'time' | 'subgroup';
+export type SortBy = 'default' | 'difficulty' | 'time' | 'subgroup' | 'due';
 
 // P-level options surfaced in the LoopForm / BacklogProcessor drop-
 // downs. P1:<stakeholder> pulls the primary stakeholder tag from
@@ -398,6 +425,12 @@ export function sortLoops(loops: Loop[], by: SortBy): Loop[] {
     if (by === 'time')
       return (a.timeEstimateMinutes ?? 999999) - (b.timeEstimateMinutes ?? 999999);
     if (by === 'subgroup') return (a.subGroup ?? '').localeCompare(b.subGroup ?? '');
+    if (by === 'due') {
+      const da = a.dueDate ?? '\uffff';
+      const db = b.dueDate ?? '\uffff';
+      if (da !== db) return da.localeCompare(db);
+      return pLevelRank(a.pLevel) - pLevelRank(b.pLevel);
+    }
     return 0;
   });
   return sorted;
@@ -487,7 +520,8 @@ export function eventKindClasses(kind: EventKind): {
 export const DAY_SECTIONS: { label: string; startMin: number; endMin: number }[] = [
   { label: 'morning', startMin: DAY_START_MIN, endMin: 12 * 60 },
   { label: 'afternoon', startMin: 12 * 60, endMin: 17 * 60 },
-  { label: 'evening', startMin: 17 * 60, endMin: DAY_END_MIN },
+  { label: 'evening', startMin: 17 * 60, endMin: 21 * 60 },
+  { label: 'night', startMin: 21 * 60, endMin: DAY_END_MIN },
 ];
 
 export const TIER_LIST: Tier[] = ['now', 'soon', 'someday'];

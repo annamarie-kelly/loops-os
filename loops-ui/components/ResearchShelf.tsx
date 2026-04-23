@@ -46,10 +46,12 @@ export function ResearchShelf({
   docs,
   onSwitchToDesign,
   onArtifactViaChat,
+  onFocusViaChat,
 }: {
   docs: ResearchDoc[];
   onSwitchToDesign?: () => void;
   onArtifactViaChat?: (doc: ResearchDoc) => void;
+  onFocusViaChat?: (doc: ResearchDoc) => void;
 }) {
   const [promoting, setPromoting] = useState<string | null>(null);
   const [activeFilters, setActiveFilters] = useState<Set<ResearchCategory>>(
@@ -61,6 +63,10 @@ export function ResearchShelf({
     return new Set(docs.filter((d) => d.favorite).map((d) => d.id));
   });
   const [openDoc, setOpenDoc] = useState<ResearchDoc | null>(null);
+  const [showNewDoc, setShowNewDoc] = useState(false);
+  const [newDocTitle, setNewDocTitle] = useState('');
+  const [newDocContent, setNewDocContent] = useState('');
+  const [savingNew, setSavingNew] = useState(false);
   // Split ratio: percentage of width for the card grid (left pane).
   // 100 = reader closed, 50 = even split, 20 = mostly reader.
   const [splitPct, setSplitPct] = useState(25);
@@ -237,28 +243,38 @@ export function ResearchShelf({
 
         {/* Search + filter bar */}
         <div className="px-5 pb-3 flex flex-col gap-2 shrink-0">
-          {/* Search input */}
-          <div className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search research..."
-              className="w-full text-[11px] pl-7 pr-3 py-1.5 rounded-md border border-edge bg-surface text-ink placeholder:text-ink-ghost focus:outline-none focus:border-edge-hover transition-colors"
-            />
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-ink-ghost" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="6.5" cy="6.5" r="5" />
-              <path d="M10.5 10.5L14.5 14.5" strokeLinecap="round" />
-            </svg>
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-ghost hover:text-ink text-[11px]"
-              >
-                &#x2715;
-              </button>
-            )}
+          {/* Search input + Add button */}
+          <div className="flex items-center gap-2">
+            <div className="relative max-w-[280px]">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search research..."
+                className="w-full text-[11px] pl-7 pr-3 py-1.5 rounded-md border border-edge bg-surface text-ink placeholder:text-ink-ghost focus:outline-none focus:border-edge-hover transition-colors"
+              />
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-ink-ghost" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="6.5" cy="6.5" r="5" />
+                <path d="M10.5 10.5L14.5 14.5" strokeLinecap="round" />
+              </svg>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-ghost hover:text-ink text-[11px]"
+                >
+                  &#x2715;
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowNewDoc(true)}
+              className="text-[11px] text-ink-soft hover:text-ink px-2.5 py-1.5 rounded-md border border-edge hover:border-edge-hover hover:bg-inset transition-colors shrink-0"
+              title="Add research doc — paste markdown from Claude"
+            >
+              + Add
+            </button>
           </div>
 
           {/* Filter chips */}
@@ -361,8 +377,84 @@ export function ResearchShelf({
           <ResearchReader
             doc={openDoc}
             onClose={() => setOpenDoc(null)}
+            onFocus={onFocusViaChat ? (d) => onFocusViaChat(d) : undefined}
           />
         </>
+      )}
+      {/* New doc sheet — paste markdown from Claude */}
+      {showNewDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
+          <div className="bg-[var(--surface-page)] border border-edge rounded-xl shadow-xl w-[560px] max-h-[80vh] flex flex-col">
+            <div className="px-5 py-4 border-b border-edge flex items-center gap-3">
+              <h3 className="text-[14px] font-medium text-ink flex-1">Add research doc</h3>
+              <button
+                type="button"
+                onClick={() => { setShowNewDoc(false); setNewDocTitle(''); setNewDocContent(''); }}
+                className="text-ink-ghost hover:text-ink text-[14px] px-1.5 py-0.5 rounded hover:bg-inset transition-colors"
+              >
+                &#x2715;
+              </button>
+            </div>
+            <div className="px-5 py-3 space-y-3 flex-1 min-h-0 flex flex-col">
+              <input
+                type="text"
+                value={newDocTitle}
+                onChange={(e) => setNewDocTitle(e.target.value)}
+                placeholder="Title (e.g. YC Application Research)"
+                className="w-full text-[12px] px-3 py-2 rounded-md border border-edge bg-surface text-ink placeholder:text-ink-ghost focus:outline-none focus:border-edge-hover"
+                autoFocus
+              />
+              <textarea
+                value={newDocContent}
+                onChange={(e) => setNewDocContent(e.target.value)}
+                placeholder="Paste markdown content here..."
+                className="flex-1 min-h-[200px] w-full resize-none text-[11px] px-3 py-2 rounded-md border border-edge bg-surface text-ink font-mono leading-relaxed placeholder:text-ink-ghost focus:outline-none focus:border-edge-hover scrollbar-subtle"
+              />
+            </div>
+            <div className="px-5 py-3 border-t border-edge flex items-center gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => { setShowNewDoc(false); setNewDocTitle(''); setNewDocContent(''); }}
+                className="text-[11px] text-ink-soft hover:text-ink px-3 py-1.5 rounded-md border border-edge hover:border-edge-hover transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!newDocTitle.trim() || !newDocContent.trim() || savingNew}
+                onClick={async () => {
+                  setSavingNew(true);
+                  const fileName = newDocTitle.trim().replace(/[/\\]/g, '—');
+                  const filePath = `02-Thinking/${fileName}.md`;
+                  // Prepend frontmatter if not already present
+                  let body = newDocContent;
+                  if (!body.trimStart().startsWith('---')) {
+                    const today = new Date().toISOString().slice(0, 10);
+                    body = `---\ncreated: ${today}\ntype: reference\nstatus: active\ntags: []\n---\n\n${body}`;
+                  }
+                  try {
+                    await fetch('/api/vault/write', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ file: filePath, content: body }),
+                    });
+                    setShowNewDoc(false);
+                    setNewDocTitle('');
+                    setNewDocContent('');
+                    // Docs will refresh on next poll cycle
+                  } catch {
+                    console.error('Failed to create doc');
+                  } finally {
+                    setSavingNew(false);
+                  }
+                }}
+                className="text-[11px] font-medium text-white bg-[var(--mauve)] hover:opacity-90 px-3 py-1.5 rounded-md transition-opacity disabled:opacity-30"
+              >
+                {savingNew ? 'Creating...' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );
@@ -489,9 +581,11 @@ function ResearchCard({
 function ResearchReader({
   doc,
   onClose,
+  onFocus,
 }: {
   doc: ResearchDoc;
   onClose: () => void;
+  onFocus?: (doc: ResearchDoc) => void;
 }) {
   const [filePath, setFilePath] = useState(doc.filePath);
   const [title, setTitle] = useState(doc.title);
@@ -499,7 +593,12 @@ function ResearchReader({
   const [isHtml, setIsHtml] = useState(doc.isHtml ?? false);
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState<string[]>([]);
+  const [editing, setEditing] = useState(false);
+  const [editBuffer, setEditBuffer] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Reset when doc changes externally
   useEffect(() => {
@@ -507,6 +606,8 @@ function ResearchReader({
     setTitle(doc.title);
     setIsHtml(doc.isHtml ?? false);
     setHistory([]);
+    setEditing(false);
+    setDirty(false);
   }, [doc.filePath, doc.title, doc.isHtml]);
 
   // Fetch content when filePath changes
@@ -534,14 +635,44 @@ function ResearchReader({
       });
   }, [filePath, doc.filePath]);
 
-  // Esc to close
+  // Esc to close (or exit edit mode)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (editing) { setEditing(false); setDirty(false); }
+        else onClose();
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  }, [onClose, editing]);
+
+  const startEditing = useCallback(() => {
+    setEditBuffer(content || '');
+    setEditing(true);
+    setDirty(false);
+    setTimeout(() => textareaRef.current?.focus(), 50);
+  }, [content]);
+
+  const saveEdit = useCallback(async () => {
+    setSaving(true);
+    try {
+      await fetch('/api/vault/write', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: filePath, content: editBuffer }),
+      });
+      setContent(editBuffer);
+      setEditing(false);
+      setDirty(false);
+    } catch {
+      console.error('Save failed');
+    } finally {
+      setSaving(false);
+    }
+  }, [filePath, editBuffer]);
+
+  const obsidianUrl = `obsidian://open?vault=${encodeURIComponent('obsidian-vault')}&file=${encodeURIComponent(filePath.replace(/\.md$/, ''))}`;
 
   // Handle wikilink clicks
   const handleContentClick = useCallback((e: React.MouseEvent) => {
@@ -587,19 +718,41 @@ function ResearchReader({
             <span>{filePath}</span>
           </div>
         </div>
-        <span className="text-[9px] text-ink-ghost">esc to close</span>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-ink-ghost hover:text-ink text-[14px] px-1.5 py-0.5 rounded hover:bg-inset transition-colors"
-          title="Close reader (Esc)"
-        >
-          &#x2715;
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {onFocus && (
+            <button
+              type="button"
+              onClick={() => onFocus(doc)}
+              className="text-[10px] font-medium text-[var(--mauve)] bg-mauve-fill hover:bg-mauve-fill/70 px-2.5 py-1 rounded-md border border-[var(--mauve)]/20 hover:border-[var(--mauve)]/40 transition-colors"
+              title="Start a focus session on this doc"
+            >
+              Focus
+            </button>
+          )}
+          <span className="text-[9px] text-ink-ghost">esc</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-ink-ghost hover:text-ink text-[14px] px-1.5 py-0.5 rounded hover:bg-inset transition-colors"
+            title="Close reader (Esc)"
+          >
+            &#x2715;
+          </button>
+        </div>
       </div>
 
       {/* Reader body */}
-      {isHtml && content ? (
+      {editing ? (
+        <div className="flex-1 min-h-0 flex flex-col">
+          <textarea
+            ref={textareaRef}
+            value={editBuffer}
+            onChange={(e) => { setEditBuffer(e.target.value); setDirty(true); }}
+            className="flex-1 min-h-0 w-full resize-none px-5 py-4 text-[12px] text-ink bg-transparent font-mono leading-relaxed focus:outline-none scrollbar-subtle"
+            spellCheck={false}
+          />
+        </div>
+      ) : isHtml && content ? (
         <iframe
           srcDoc={content}
           className="flex-1 min-h-0 w-full border-none"

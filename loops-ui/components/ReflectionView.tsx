@@ -227,22 +227,21 @@ function CheckpointDrill({
       </div>
     );
   }
-  const pressureLabel =
-    checkpoint.pressure === 'chose'
-      ? 'Chose their work'
-      : checkpoint.pressure === 'reactive'
-        ? 'Mostly reactive'
-        : checkpoint.pressure === 'task_monkey'
-          ? 'Task-monkey mode'
-          : '—';
-  const pressureAccent =
-    checkpoint.pressure === 'chose'
-      ? 'var(--sage)'
-      : checkpoint.pressure === 'reactive'
-        ? 'var(--tan)'
-        : checkpoint.pressure === 'task_monkey'
-          ? 'var(--rose)'
-          : 'var(--text-ghost)';
+  const PRESSURE_META: Record<string, { label: string; accent: string }> = {
+    building: { label: 'Building new things', accent: 'var(--sage)' },
+    improving: { label: 'Improving what exists', accent: 'var(--mauve)' },
+    fixing: { label: 'Fixing & debugging', accent: 'var(--tan)' },
+    supporting: { label: 'Supporting & responding', accent: 'var(--rose)' },
+    chose: { label: 'Building new things', accent: 'var(--sage)' },
+    reactive: { label: 'Fixing & debugging', accent: 'var(--tan)' },
+    task_monkey: { label: 'Supporting & responding', accent: 'var(--rose)' },
+  };
+  const pressureVal = Array.isArray(checkpoint.pressure) ? checkpoint.pressure[0] : checkpoint.pressure;
+  const meta = PRESSURE_META[pressureVal ?? ''] ?? { label: '—', accent: 'var(--text-ghost)' };
+  const pressureLabel = Array.isArray(checkpoint.pressure) && checkpoint.pressure.length > 1
+    ? checkpoint.pressure.map((p) => PRESSURE_META[p]?.label ?? p).join(' + ')
+    : meta.label;
+  const pressureAccent = meta.accent;
   return (
     <div className="flex flex-col gap-3 text-[12px]">
       <div className="flex items-center gap-2">

@@ -384,6 +384,29 @@ export async function GET(request: Request) {
         /* fall back to the pre-reconcile tag */
       }
     }
+    // Inject _sourceLineCount for context hygiene indicators. Uses a
+    // lightweight stat pass — only reads files we haven't already cached.
+    if (Array.isArray(parsed?.loops)) {
+      const lineCountCache = new Map<string, number>();
+      for (const l of parsed.loops) {
+        const file = l.source?.file;
+        if (!file) continue;
+        if (lineCountCache.has(file)) {
+          (l as Record<string, unknown>)._sourceLineCount = lineCountCache.get(file);
+          continue;
+        }
+        try {
+          const abs = path.join(VAULT_ROOT, file);
+          const content = await fs.readFile(abs, 'utf-8');
+          const count = content.split('\n').length;
+          lineCountCache.set(file, count);
+          (l as Record<string, unknown>)._sourceLineCount = count;
+        } catch {
+          lineCountCache.set(file, 0);
+        }
+      }
+    }
+
     return NextResponse.json(parsed, {
       headers: {
         ETag: responseEtag,

@@ -412,6 +412,15 @@ export function FocusMode({
 
   const [closeOpen, setCloseOpen] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [specStatus, setSpecStatus] = useState<string | null>(null);
+
+  // Sibling loops: all loops (including done) sharing the same source file
+  // Must be called unconditionally (before any early return) to satisfy Rules of Hooks
+  const pickedSourceFile = picked?.loop?.source?.file ?? '';
+  const allSiblings = useMemo(() => {
+    if (!pickedSourceFile) return [];
+    return (allLoops ?? loops).filter((l) => l.source?.file === pickedSourceFile);
+  }, [allLoops, loops, pickedSourceFile]);
 
   // Reset editing when switching loops or returning to picker
   useEffect(() => {
@@ -588,17 +597,8 @@ export function FocusMode({
   const est = loop.timeEstimateMinutes;
   const sourceFile = loop.source?.file ?? '';
 
-  // Sibling loops: all loops (including done) sharing the same source file
-  const allSiblings = useMemo(() => {
-    if (!sourceFile) return [];
-    return (allLoops ?? loops).filter((l) => l.source?.file === sourceFile);
-  }, [allLoops, loops, sourceFile]);
-
   const activeSiblingCount = allSiblings.filter((l) => !l.done).length;
   const doneSiblingCount = allSiblings.filter((l) => l.done).length;
-
-  // Spec status: parse from fetched content frontmatter (set by FocusSpecContent)
-  const [specStatus, setSpecStatus] = useState<SpecStatus | null>(null);
 
   const isSpec = sourceFile.includes('Agent Specs');
   const isBuildingOrShipped = specStatus === 'building' || specStatus === 'shipped';
@@ -666,18 +666,6 @@ export function FocusMode({
 
         {/* Stage-appropriate action buttons */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Edit toggle */}
-          <button
-            type="button"
-            onClick={() => setEditing((v) => !v)}
-            className={`text-[10px] font-medium px-2.5 py-1 rounded-md border transition-colors ${
-              editing
-                ? 'text-ink bg-inset border-edge-hover'
-                : 'text-ink-soft bg-transparent border-edge hover:border-edge-hover hover:text-ink'
-            }`}
-          >
-            {editing ? 'Viewing' : 'Edit'}
-          </button>
 
           {/* Stage buttons */}
           {!isBuildingOrShipped && (
@@ -769,129 +757,119 @@ export function FocusMode({
       )}
 
       {/* ─── Scrollable content area ───────────────────────────────── */}
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-subtle">
-        <div className="max-w-3xl mx-auto px-5 py-4 pb-20">
-          {/* Spec content */}
-          {sourceFile && (
-            <FocusSpecContent
-              filePath={sourceFile}
-              editing={editing}
-              onStopEditing={() => setEditing(false)}
-              onStatusParsed={setSpecStatus}
-            />
-          )}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* ─── Left: Spec content ─────────────────────────────────── */}
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-subtle border-r border-edge">
+          <div className="px-6 py-4 pb-20">
+            {sourceFile && (
+              <FocusSpecContent
+                filePath={sourceFile}
+                onStatusParsed={setSpecStatus}
+              />
+            )}
+          </div>
+        </div>
 
-          {/* ─── Sibling loops list ──────────────────────────────────── */}
-          {allSiblings.length > 1 && (
-            <section className="mt-8 mb-8">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="text-[10px] uppercase tracking-[0.12em] text-ink-ghost">
-                  Tasks
+        {/* ─── Right: Tasks + Notes ───────────────────────────────── */}
+        <div className="w-[340px] shrink-0 min-h-0 overflow-y-auto scrollbar-subtle">
+          <div className="px-4 py-4 pb-20 flex flex-col gap-6">
+
+            {/* Sibling loops list */}
+            {allSiblings.length > 1 && (
+              <section>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="text-[10px] uppercase tracking-[0.12em] text-ink-ghost">
+                    Tasks
+                  </div>
+                  <span className="text-[10px] text-ink-ghost tabular-nums font-mono">
+                    {doneSiblingCount}/{allSiblings.length} done
+                  </span>
                 </div>
-                <span className="text-[10px] text-ink-ghost tabular-nums font-mono">
-                  {doneSiblingCount}/{allSiblings.length} done
-                </span>
-              </div>
 
-              {/* Thin progress bar for siblings */}
-              <div className="h-[3px] rounded-full bg-inset overflow-hidden mb-3">
-                <div
-                  className="h-full bg-sage-fill transition-all duration-300"
-                  style={{ width: `${allSiblings.length > 0 ? (doneSiblingCount / allSiblings.length) * 100 : 0}%` }}
-                />
-              </div>
+                <div className="h-[3px] rounded-full bg-inset overflow-hidden mb-3">
+                  <div
+                    className="h-full bg-sage-fill transition-all duration-300"
+                    style={{ width: `${allSiblings.length > 0 ? (doneSiblingCount / allSiblings.length) * 100 : 0}%` }}
+                  />
+                </div>
 
-              <ul className="flex flex-col gap-1">
-                {/* Active siblings first, done at bottom */}
-                {[...allSiblings]
-                  .sort((a, b) => {
-                    if (a.done && !b.done) return 1;
-                    if (!a.done && b.done) return -1;
-                    return 0;
-                  })
-                  .map((sib) => {
-                    const isPicked = sib.id === loop.id;
-                    const sibEst = sib.timeEstimateMinutes;
-                    return (
-                      <li
-                        key={sib.id}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-md text-[12px] transition-colors cursor-pointer ${
-                          isPicked
-                            ? 'border border-[var(--sage)] bg-sage-fill/20'
-                            : 'border border-transparent hover:bg-inset/60'
-                        } ${sib.done ? 'opacity-50' : ''}`}
-                        onClick={() => {
-                          if (!sib.done && sib.id !== loop.id) {
-                            setPickedId(sib.id);
-                          }
-                        }}
-                      >
-                        {/* Checkbox */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!sib.done) {
-                              void onCloseLoop(sib.id);
+                <ul className="flex flex-col gap-1">
+                  {[...allSiblings]
+                    .sort((a, b) => {
+                      if (a.done && !b.done) return 1;
+                      if (!a.done && b.done) return -1;
+                      return 0;
+                    })
+                    .map((sib) => {
+                      const isPicked = sib.id === loop.id;
+                      const sibEst = sib.timeEstimateMinutes;
+                      return (
+                        <li
+                          key={sib.id}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] transition-colors cursor-pointer ${
+                            isPicked
+                              ? 'border border-[var(--sage)] bg-sage-fill/20'
+                              : 'border border-transparent hover:bg-inset/60'
+                          } ${sib.done ? 'opacity-50' : ''}`}
+                          onClick={() => {
+                            if (!sib.done && sib.id !== loop.id) {
+                              setPickedId(sib.id);
                             }
                           }}
-                          className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center transition-colors ${
-                            sib.done
-                              ? 'bg-sage-fill border-[var(--sage)] text-sage-text'
-                              : 'border-edge hover:border-[var(--sage)]'
-                          }`}
-                          disabled={sib.done}
                         >
-                          {sib.done && <span className="text-[10px]">&#10003;</span>}
-                        </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!sib.done) void onCloseLoop(sib.id);
+                            }}
+                            className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center transition-colors ${
+                              sib.done
+                                ? 'bg-sage-fill border-[var(--sage)] text-sage-text'
+                                : 'border-edge hover:border-[var(--sage)]'
+                            }`}
+                            disabled={sib.done}
+                          >
+                            {sib.done && <span className="text-[8px]">&#10003;</span>}
+                          </button>
 
-                        {/* Text */}
-                        <span className={`flex-1 min-w-0 truncate leading-snug ${
-                          sib.done ? 'line-through text-ink-ghost' : 'text-ink'
-                        }`}>
-                          {stripInlineMarkdown(sib.text)}
-                        </span>
-
-                        {/* Status dot */}
-                        {!sib.done && (
-                          <span className={`w-[6px] h-[6px] rounded-full shrink-0 ${
-                            sib.blocked ? 'bg-[var(--rose)]' : 'bg-sage-fill'
-                          }`} />
-                        )}
-
-                        {/* pLevel pill */}
-                        {sib.pLevel && !sib.done && (
-                          <span className={`text-[9px] font-mono px-1.5 py-[1px] rounded shrink-0 ${pPillClass(sib.pLevel)}`}>
-                            {sib.pLevel}
+                          <span className={`flex-1 min-w-0 truncate leading-snug ${
+                            sib.done ? 'line-through text-ink-ghost' : 'text-ink'
+                          }`}>
+                            {stripInlineMarkdown(sib.text)}
                           </span>
-                        )}
 
-                        {/* Time estimate */}
-                        {sibEst != null && !sib.done && (
-                          <span className="text-[10px] text-ink-ghost font-mono tabular-nums shrink-0">
-                            {formatMinutes(sibEst)}
-                          </span>
-                        )}
+                          {!sib.done && (
+                            <span className={`w-[5px] h-[5px] rounded-full shrink-0 ${
+                              sib.blocked ? 'bg-[var(--rose)]' : 'bg-sage-fill'
+                            }`} />
+                          )}
 
-                        {/* "this one" indicator */}
-                        {isPicked && (
-                          <span className="text-[9px] text-sage-text font-medium shrink-0">
-                            current
-                          </span>
-                        )}
-                      </li>
-                    );
-                  })}
-              </ul>
-            </section>
-          )}
+                          {sibEst != null && !sib.done && (
+                            <span className="text-[9px] text-ink-ghost font-mono tabular-nums shrink-0">
+                              {formatMinutes(sibEst)}
+                            </span>
+                          )}
 
-          {/* ─── Notes ───────────────────────────────────────────────── */}
-          <FocusNotes
-            loop={loop}
-            notesRef={notesRef}
-            onUpdateLoop={onUpdateLoop}
-          />
+                          {isPicked && (
+                            <span className="text-[8px] text-sage-text font-medium shrink-0">
+                              ●
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                </ul>
+              </section>
+            )}
+
+            {/* Notes */}
+            <FocusNotes
+              loop={loop}
+              notesRef={notesRef}
+              onUpdateLoop={onUpdateLoop}
+            />
+          </div>
         </div>
       </div>
 
@@ -990,14 +968,10 @@ function FocusNotes({
 
 function FocusSpecContent({
   filePath: initialFilePath,
-  editing,
-  onStopEditing,
   onStatusParsed,
 }: {
   filePath: string;
-  editing: boolean;
-  onStopEditing: () => void;
-  onStatusParsed?: (status: SpecStatus | null) => void;
+  onStatusParsed?: (status: string | null) => void;
 }) {
   const [filePath, setFilePath] = useState(initialFilePath);
   const [content, setContent] = useState<string | null>(null);
@@ -1005,16 +979,19 @@ function FocusSpecContent({
   const [isHtml, setIsHtml] = useState(false);
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState<string[]>([]);
+  const [editing, setEditing] = useState(false);
   const [editBuffer, setEditBuffer] = useState('');
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset when source file changes
   useEffect(() => {
     setFilePath(initialFilePath);
     setHistory([]);
+    setEditing(false);
   }, [initialFilePath]);
 
   // Fetch content
@@ -1031,13 +1008,9 @@ function FocusSpecContent({
         setLoading(false);
         scrollRef.current?.scrollTo(0, 0);
 
-        // Parse status from frontmatter for the header badge.
-        // The read endpoint strips frontmatter, but we can try to
-        // infer from the content or fetch separately. For now, look
-        // for a "status:" line near the top (some specs have it in body).
         if (filePath === initialFilePath && onStatusParsed) {
           const statusMatch = (data.content || '').match(/^status:\s*(drafting|ready|building|shipped)/m);
-          onStatusParsed(statusMatch ? (statusMatch[1] as SpecStatus) : null);
+          onStatusParsed(statusMatch ? statusMatch[1] : null);
         }
       })
       .catch(() => {
@@ -1046,14 +1019,46 @@ function FocusSpecContent({
       });
   }, [filePath, initialFilePath, onStatusParsed]);
 
-  // When entering edit mode, populate buffer
+  // Auto-save with debounce (1.5s after last keystroke)
   useEffect(() => {
-    if (editing && rawContent) {
-      setEditBuffer(rawContent);
+    if (!dirty || !editing) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      void doSave(editBuffer);
+    }, 1500);
+    return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
+  }, [editBuffer, dirty, editing]);
+
+  const doSave = async (text: string) => {
+    setSaving(true);
+    try {
+      await fetch('/api/vault/write', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: filePath, content: text }),
+      });
+      setContent(text);
+      setRawContent(text);
       setDirty(false);
-      setTimeout(() => textareaRef.current?.focus(), 50);
+    } catch {
+      console.error('Save failed');
+    } finally {
+      setSaving(false);
     }
-  }, [editing, rawContent]);
+  };
+
+  const startEditing = () => {
+    if (isHtml || !rawContent) return;
+    setEditBuffer(rawContent);
+    setDirty(false);
+    setEditing(true);
+    setTimeout(() => textareaRef.current?.focus(), 50);
+  };
+
+  const stopEditing = async () => {
+    if (dirty) await doSave(editBuffer);
+    setEditing(false);
+  };
 
   // Save handler
   const saveEdit = useCallback(async () => {
@@ -1121,7 +1126,7 @@ function FocusSpecContent({
         </button>
       )}
 
-      {isHtml && !editing ? (
+      {isHtml ? (
         <iframe
           srcDoc={content}
           className="w-full border border-edge rounded-lg min-h-[60vh]"
@@ -1137,29 +1142,41 @@ function FocusSpecContent({
             onKeyDown={(e) => {
               if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
-                if (dirty) saveEdit();
+                if (dirty) void doSave(editBuffer);
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                void stopEditing();
               }
             }}
-            className="w-full min-h-[60vh] text-[12px] text-ink font-mono leading-relaxed bg-inset border border-edge rounded-lg px-4 py-3 outline-none resize-none"
+            className="w-full min-h-[60vh] text-[12px] text-ink font-mono leading-relaxed bg-surface border-none rounded-lg px-4 py-3 outline-none resize-none"
             spellCheck={false}
           />
-          {dirty && (
-            <div className="absolute top-2 right-2 flex items-center gap-2">
-              <span className="text-[9px] text-ink-ghost">unsaved</span>
-              <button
-                type="button"
-                onClick={saveEdit}
-                disabled={saving}
-                className="text-[10px] font-medium text-sage-text bg-sage-fill px-2 py-0.5 rounded border border-[var(--sage)]/40 hover:brightness-110 transition disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : 'Save (Cmd+S)'}
-              </button>
-            </div>
-          )}
+          <div className="absolute top-2 right-2 flex items-center gap-1.5">
+            {saving && <span className="text-[9px] text-sage-text">saving...</span>}
+            {dirty && !saving && <span className="text-[9px] text-ink-ghost">auto-saves</span>}
+            <button
+              type="button"
+              onClick={() => void stopEditing()}
+              className="text-[9px] text-ink-ghost hover:text-ink-soft px-1.5 py-0.5 rounded hover:bg-inset transition-colors"
+            >
+              done editing
+            </button>
+          </div>
         </div>
       ) : (
         <div
-          onClick={handleContentClick}
+          onClick={(e) => {
+            const target = e.target as HTMLElement;
+            const link = target.closest('a[data-vault-link]') as HTMLAnchorElement | null;
+            if (link) {
+              handleContentClick(e);
+              return;
+            }
+            startEditing();
+          }}
+          className="cursor-text hover:bg-inset/30 rounded-lg transition-colors -mx-2 px-2 py-1"
+          title="Click to edit — changes save to Obsidian"
           dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
         />
       )}

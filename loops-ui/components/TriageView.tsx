@@ -67,11 +67,13 @@ export function TriageView({
   onRefetch,
   onOpenDetail,
   onUpdateLoop,
+  onSwitchToBacklog,
 }: {
   loops: Loop[];
   onRefetch: () => Promise<void>;
   onOpenDetail: (id: string) => void;
   onUpdateLoop?: (id: string, patch: Partial<Loop>) => Promise<void>;
+  onSwitchToBacklog?: () => void;
 }) {
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [queueIdx, setQueueIdx] = useState(0);
@@ -508,6 +510,7 @@ export function TriageView({
         mode={viewMode}
         onSetMode={setViewMode}
         onReAnalyze={reAnalyze}
+        onSwitchToBacklog={onSwitchToBacklog}
       />
       {overcommit && <OvercommitNudge counts={counts} />}
 
@@ -583,6 +586,7 @@ function TriageProgress({
   mode,
   onSetMode,
   onReAnalyze,
+  onSwitchToBacklog,
 }: {
   counts: SessionCounts;
   remaining: number;
@@ -590,6 +594,7 @@ function TriageProgress({
   mode: 'card' | 'list';
   onSetMode: (m: 'card' | 'list') => void;
   onReAnalyze: () => void;
+  onSwitchToBacklog?: () => void;
 }) {
   const total = counts.processed + remaining;
   return (
@@ -611,6 +616,16 @@ function TriageProgress({
         </div>
       )}
       <div className="ml-auto flex items-center gap-2">
+        {onSwitchToBacklog && (
+          <button
+            type="button"
+            onClick={onSwitchToBacklog}
+            className="text-[11px] text-ink-soft hover:text-ink px-2 py-1 rounded-md bg-card border border-edge hover:border-edge-hover transition-colors"
+            title="View all active loops grouped by mode, size, or domain"
+          >
+            Backlog
+          </button>
+        )}
         <button
           type="button"
           onClick={onReAnalyze}

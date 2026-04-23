@@ -7,10 +7,10 @@
     "build": "next build",
     "start": "next start -p 3456",
     "seed-loops": "node scripts/seed-loops.mjs",
-    "refresh-loops": "node scripts/refresh-loops.mjs && node scripts/notes-index.mjs",
-    "refresh-loops:dry": "node scripts/refresh-loops.mjs --dry-run",
-    "notes-index": "node scripts/notes-index.mjs",
-    "notes-index:dry": "node scripts/notes-index.mjs --dry"
+    "refresh-loops": "node --env-file=.env.local scripts/refresh-loops.mjs && node --env-file=.env.local scripts/notes-index.mjs",
+    "refresh-loops:dry": "node --env-file=.env.local scripts/refresh-loops.mjs --dry-run",
+    "notes-index": "node --env-file=.env.local scripts/notes-index.mjs",
+    "notes-index:dry": "node --env-file=.env.local scripts/notes-index.mjs --dry"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -18,7 +18,8 @@
     "@dnd-kit/utilities": "^3.2.2",
     "next": "16.2.3",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

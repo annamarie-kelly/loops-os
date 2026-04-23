@@ -3,7 +3,7 @@
 // Header: split chrome. Primary row is logo + segmented mode toggle + summary + bulk toolbar.
 // Secondary row is only shown in Triage mode: sort + P0..P4 filter chips.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Mode, SortBy, Theme } from '@/lib/ui';
 import { formatMinutes } from '@/lib/types';
 import { LS_THEME, applyTheme, STAKEHOLDERS } from '@/lib/ui';
@@ -97,6 +97,12 @@ export function Header({
             <ModeButton active={mode === 'focus'} onClick={() => onSetMode('focus')}>
               Focus
             </ModeButton>
+            <ModeButton
+              active={mode === 'plan' || mode === 'research' || mode === 'design' || mode === 'ship'}
+              onClick={() => onSetMode('research')}
+            >
+              Plan
+            </ModeButton>
             <ModeButton active={mode === 'triage'} onClick={() => onSetMode('triage')}>
               <span className="flex items-center gap-1.5">
                 Triage
@@ -107,38 +113,9 @@ export function Header({
                 )}
               </span>
             </ModeButton>
-            <ModeButton active={mode === 'plan'} onClick={() => onSetMode('plan')}>
-              Plan
-            </ModeButton>
             <ModeButton active={mode === 'reflect'} onClick={() => onSetMode('reflect')}>
               Reflect
             </ModeButton>
-          </div>
-
-          {/* Secondary surfaces — not part of the primary workflow */}
-          <div className="hidden md:flex items-center gap-2 text-[11px] text-ink-ghost">
-            <button
-              type="button"
-              onClick={() => onSetMode('backlog')}
-              className={`px-1.5 py-0.5 rounded transition-colors ${
-                mode === 'backlog'
-                  ? 'text-ink bg-inset'
-                  : 'hover:text-ink-soft'
-              }`}
-            >
-              Backlog
-            </button>
-            <button
-              type="button"
-              onClick={() => onSetMode('someday')}
-              className={`px-1.5 py-0.5 rounded transition-colors ${
-                mode === 'someday'
-                  ? 'text-ink bg-inset'
-                  : 'hover:text-ink-soft'
-              }`}
-            >
-              Someday
-            </button>
           </div>
 
           {/* Free-time chip — a single actionable number. Green when
@@ -328,5 +305,77 @@ function ThemeToggle({ theme, onChange }: { theme: Theme; onChange: (t: Theme) =
     >
       {resolved === 'dark' ? '●' : '○'}
     </button>
+  );
+}
+
+const PIPELINE_ITEMS = [
+  { mode: 'research' as const, label: 'Research', dot: 'bg-tan-fill' },
+  { mode: 'design' as const, label: 'Design', dot: 'bg-[var(--ocean,#7A9AA0)]' },
+  { mode: 'backlog' as const, label: 'Build', dot: 'bg-sage-fill' },
+  { mode: 'ship' as const, label: 'Ship', dot: 'bg-ink-ghost' },
+] as const;
+
+function PipelineDropdown({
+  mode,
+  onSetMode,
+}: {
+  mode: Mode;
+  onSetMode: (m: Mode) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const activePipeline = PIPELINE_ITEMS.find((p) => p.mode === mode);
+
+  return (
+    <div ref={ref} className="relative hidden md:block">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-md transition-colors ${
+          activePipeline
+            ? 'text-ink bg-inset'
+            : 'text-ink-ghost hover:text-ink-soft'
+        }`}
+      >
+        {activePipeline && (
+          <span className={`w-1.5 h-1.5 rounded-full ${activePipeline.dot}`} />
+        )}
+        {activePipeline?.label ?? 'Pipeline'}
+        <span className="text-[9px] ml-0.5">▾</span>
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 bg-elevated border border-edge rounded-lg shadow-lg py-1 z-50 min-w-[120px]">
+          {PIPELINE_ITEMS.map(({ mode: m, label, dot }) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => {
+                onSetMode(m as Mode);
+                setOpen(false);
+              }}
+              className={`w-full text-left flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors ${
+                mode === m
+                  ? 'text-ink bg-inset'
+                  : 'text-ink-soft hover:text-ink hover:bg-inset/50'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

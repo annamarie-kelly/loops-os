@@ -8,7 +8,7 @@
 //   compact  — Someday / dense lists (12px)
 //   sidebar  — LoopDrawer (13px title, wraps to 2 lines, roomier padding)
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useDraggable } from '@dnd-kit/core';
 import type { Loop } from '@/lib/types';
@@ -17,6 +17,145 @@ import { effectiveWorkMode, pPillClass, WORK_MODE_META } from '@/lib/ui';
 import { renderInlineMarkdown } from '@/lib/markdown';
 import { TierDot } from './PriorityDot';
 import { TomorrowBadge } from './TomorrowBadge';
+
+// ─── Inline priority picker ────────────────────────────────────────
+// At rest: shows the pLevel pill. On click: expands to a row of 5
+// small colored buttons. Click one to save, click away to dismiss.
+const PRIORITY_OPTIONS = ['P0', 'P1', 'P2', 'P3', 'P4'];
+
+function InlinePriorityPicker({
+  value,
+  onSave,
+}: {
+  value: string | null;
+  onSave: (p: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  if (!open) {
+    const display = value || 'P—';
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        onPointerDown={(e) => e.stopPropagation()}
+        className={`font-mono px-1.5 py-[1px] rounded cursor-pointer hover:ring-1 hover:ring-[var(--slate)] transition-all ${pPillClass(value)}`}
+        title="Click to change priority"
+      >
+        {display}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      ref={ref}
+      className="flex items-center gap-[3px] animate-[fadeIn_80ms_ease]"
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      {PRIORITY_OPTIONS.map((p) => (
+        <button
+          key={p}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSave(p);
+            setOpen(false);
+          }}
+          className={`font-mono px-1 py-[1px] rounded text-[9px] cursor-pointer transition-all hover:scale-110 ${pPillClass(p)} ${
+            value?.startsWith(p) ? 'ring-1 ring-[var(--slate)]' : ''
+          }`}
+        >
+          {p}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Inline time picker ────────────────────────────────────────────
+// At rest: shows formatted time. On click: small number input.
+// Enter/blur saves, Escape cancels.
+function InlineTimePicker({
+  value,
+  onSave,
+}: {
+  value: number | null;
+  onSave: (n: number | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const startEdit = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDraft(value != null ? String(value) : '');
+    setEditing(true);
+  }, [value]);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  const commit = () => {
+    const n = parseInt(draft, 10);
+    onSave(isNaN(n) || n <= 0 ? null : n);
+    setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={startEdit}
+        onPointerDown={(e) => e.stopPropagation()}
+        className="cursor-pointer hover:text-ink-soft hover:underline transition-colors"
+        title="Click to edit time estimate"
+      >
+        {value != null ? formatMinutes(value) : '—m'}
+      </button>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 animate-[fadeIn_80ms_ease]"
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <input
+        ref={inputRef}
+        type="number"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') setEditing(false);
+          e.stopPropagation();
+        }}
+        onBlur={commit}
+        step={15}
+        min={0}
+        className="w-[3.5rem] text-[10px] px-1 py-[1px] bg-inset border border-edge rounded text-ink tabular-nums focus:outline-none focus:border-[var(--slate)]"
+        placeholder="min"
+      />
+      <span className="text-ink-ghost">m</span>
+    </span>
+  );
+}
 
 export type RowDensity = 'hero' | 'default' | 'compact' | 'sidebar';
 
@@ -29,6 +168,7 @@ export function LoopRow({
   onCalendar,
   onToggleSelect,
   onStartEdit,
+  onSaveEdit,
   onKill,
   onQuickSchedule,
 }: {
@@ -40,6 +180,7 @@ export function LoopRow({
   onCalendar?: boolean;
   onToggleSelect: (id: string, shiftKey: boolean, cmdKey: boolean) => void;
   onStartEdit: (id: string) => void;
+  onSaveEdit?: (id: string, patch: Partial<Loop>) => Promise<void>;
   onKill?: (id: string) => void;
   onQuickSchedule?: (id: string) => void;
 }) {
@@ -214,16 +355,26 @@ export function LoopRow({
         </div>
         {density === 'sidebar' && (
           <div className="mt-1 flex items-center gap-1.5 text-[10px] text-ink-ghost tabular-nums flex-wrap">
-            {loop.pLevel && (
+            {onSaveEdit ? (
+              <InlinePriorityPicker
+                value={loop.pLevel}
+                onSave={(p) => onSaveEdit(loop.id, { pLevel: p })}
+              />
+            ) : loop.pLevel ? (
               <span
                 className={`font-mono px-1.5 py-[1px] rounded ${pPillClass(loop.pLevel)}`}
               >
                 {loop.pLevel}
               </span>
-            )}
-            {loop.timeEstimateMinutes != null && (
+            ) : null}
+            {onSaveEdit ? (
+              <InlineTimePicker
+                value={loop.timeEstimateMinutes}
+                onSave={(n) => onSaveEdit(loop.id, { timeEstimateMinutes: n })}
+              />
+            ) : loop.timeEstimateMinutes != null ? (
               <span>{formatMinutes(loop.timeEstimateMinutes)}</span>
-            )}
+            ) : null}
             {isBlocked && (
               <span className="inline-flex items-center gap-0.5 text-berry-text">
                 <span aria-hidden>⏸</span> blocked
@@ -331,6 +482,15 @@ export function LoopRow({
               {ageDays}d
             </span>
           )}
+          {(loop as unknown as Record<string, unknown>)._sourceLineCount != null &&
+            ((loop as unknown as Record<string, unknown>)._sourceLineCount as number) > 500 && (
+              <span
+                className="text-[9px] px-1 py-[1px] rounded bg-rose-fill text-rose-text opacity-60 group-hover:opacity-100 transition-opacity"
+                title={`Source file is ${(loop as unknown as Record<string, unknown>)._sourceLineCount}  lines — may need decomposition`}
+              >
+                ⚠
+              </span>
+          )}
           {(onCalendar || (hasTimeblock && firstBlock)) && (
             <span
               className="w-1.5 h-1.5 rounded-full bg-[var(--sage)] opacity-70 mt-1"
@@ -430,6 +590,12 @@ function HoverCard({ loop, rect }: { loop: Loop; rect: DOMRect }) {
                 {firstBlock.date.slice(5)} {formatTime(firstBlock.startMinute)}
               </span>
             </>
+          )}
+          {(loop as unknown as Record<string, unknown>)._sourceLineCount != null &&
+            ((loop as unknown as Record<string, unknown>)._sourceLineCount as number) > 500 && (
+              <span className="px-1 py-[1px] rounded bg-rose-fill text-rose-text" title="Large source file — may need decomposition">
+                {(loop as unknown as Record<string, unknown>)._sourceLineCount as number}L
+              </span>
           )}
         </div>
       </div>

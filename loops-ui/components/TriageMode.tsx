@@ -6,7 +6,7 @@
 // property — not the primary axis. The calendar still answers "when",
 // triage answers "what is this and who cares about it."
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Loop, Tier } from '@/lib/types';
 import { formatMinutes, weekDates } from '@/lib/types';
 import {
@@ -33,6 +33,7 @@ const GROUP_OPTIONS: { value: GroupDim; label: string; shortcut: string }[] = [
   { value: 'size', label: 'Size', shortcut: '⇧2' },
   { value: 'person', label: 'Person', shortcut: '⇧3' },
   { value: 'subgroup', label: 'Subgroup', shortcut: '⇧4' },
+  { value: 'domain', label: 'Domain', shortcut: '⇧5' },
 ];
 
 const FILTER_OPTIONS: { value: ScheduleFilter; label: string }[] = [
@@ -83,6 +84,19 @@ export function TriageMode({
   const [switching, setSwitching] = useState(false);
   const [processorOpen, setProcessorOpen] = useState(false);
   const week = useMemo(() => new Set(weekDates()), []);
+  const addFormRef = useRef<HTMLDivElement>(null);
+
+  // Click outside the add-loop form dismisses it.
+  useEffect(() => {
+    if (!addingTier) return;
+    const handler = (e: MouseEvent) => {
+      if (addFormRef.current && !addFormRef.current.contains(e.target as Node)) {
+        onCancelAdd();
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [addingTier, onCancelAdd]);
 
   // Hydrate persisted controls.
   useEffect(() => {
@@ -115,6 +129,7 @@ export function TriageMode({
         '@': 'size',     // Shift+2
         '#': 'person',   // Shift+3
         '$': 'subgroup', // Shift+4
+        '%': 'domain',   // Shift+5
       };
       const target_dim = map[e.key];
       if (target_dim) {
@@ -399,7 +414,10 @@ export function TriageMode({
       {/* Quick-add row pinned at the bottom */}
       <div className="px-4 pb-3 shrink-0">
         {addingTier ? (
-          <div className="rounded-md border border-[var(--slate)] bg-slate-fill px-3 py-2 max-w-md">
+          <div
+            ref={addFormRef}
+            className="rounded-md border border-[var(--slate)] bg-slate-fill px-3 py-2 max-w-md"
+          >
             <LoopForm
               initial={{
                 tier: addingTier,
@@ -408,7 +426,7 @@ export function TriageMode({
                 difficulty: null,
                 timeEstimateMinutes: null,
                 subGroup: 'Manual loops',
-                domain: 'working',
+                domain: 'personal',
                 source: { file: '00-Inbox/manual-loops.md', line: 0 },
                 timeblocks: [],
               }}
@@ -420,7 +438,7 @@ export function TriageMode({
                   difficulty: patch.difficulty ?? null,
                   timeEstimateMinutes: patch.timeEstimateMinutes ?? null,
                   subGroup: 'Manual loops',
-                  domain: 'working',
+                  domain: 'personal',
                   source: { file: '00-Inbox/manual-loops.md', line: 0 },
                   timeblocks: [],
                 });
