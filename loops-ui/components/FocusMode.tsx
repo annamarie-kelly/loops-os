@@ -411,8 +411,8 @@ export function FocusMode({
   }, [pickedId, picked]);
 
   const [closeOpen, setCloseOpen] = useState(false);
-  const [editing, setEditing] = useState(false);
   const [specStatus, setSpecStatus] = useState<string | null>(null);
+  const [specCollapsed, setSpecCollapsed] = useState(true);
 
   // Sibling loops: all loops (including done) sharing the same source file
   // Must be called unconditionally (before any early return) to satisfy Rules of Hooks
@@ -422,13 +422,9 @@ export function FocusMode({
     return (allLoops ?? loops).filter((l) => l.source?.file === pickedSourceFile);
   }, [allLoops, loops, pickedSourceFile]);
 
-  // Reset editing when switching loops or returning to picker
-  useEffect(() => {
-    setEditing(false);
-  }, [pickedId]);
-
   // Keyboard: 1–5 picks a candidate while on the picker. Esc returns
-  // from focus to picker. Ignored while typing in the notes textarea.
+  // from focus to picker. Ignored while typing in a textarea/input
+  // (FocusSpecContent handles its own Esc via onBlur/onKeyDown).
   const notesRef = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -438,13 +434,6 @@ export function FocusMode({
         (target.tagName === 'INPUT' ||
           target.tagName === 'TEXTAREA' ||
           target.isContentEditable);
-
-      // Esc in edit mode exits edit, not the picker
-      if (e.key === 'Escape' && picked && editing) {
-        e.preventDefault();
-        setEditing(false);
-        return;
-      }
 
       if (typing) return;
       if (!picked) {
@@ -463,7 +452,7 @@ export function FocusMode({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [picked, clusters, editing]);
+  }, [picked, clusters]);
 
   if (!picked) {
     // ─── Step 1: project cluster picker ───────────────────────────
@@ -592,7 +581,7 @@ export function FocusMode({
     );
   }
 
-  // ─── Step 2: focus (full-context execution surface) ─────────────────
+  // ─── Step 2: focus (single-column execution surface) ────────────────
   const { loop, tb } = picked;
   const est = loop.timeEstimateMinutes;
   const sourceFile = loop.source?.file ?? '';
@@ -600,7 +589,6 @@ export function FocusMode({
   const activeSiblingCount = allSiblings.filter((l) => !l.done).length;
   const doneSiblingCount = allSiblings.filter((l) => l.done).length;
 
-  const isSpec = sourceFile.includes('Agent Specs');
   const isBuildingOrShipped = specStatus === 'building' || specStatus === 'shipped';
 
   // Progress bar
@@ -756,120 +744,119 @@ export function FocusMode({
         </div>
       )}
 
-      {/* ─── Scrollable content area ───────────────────────────────── */}
-      <div className="flex-1 min-h-0 flex overflow-hidden">
-        {/* ─── Left: Spec content ─────────────────────────────────── */}
-        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-subtle border-r border-edge">
-          <div className="px-6 py-4 pb-20">
-            {sourceFile && (
-              <FocusSpecContent
-                filePath={sourceFile}
-                onStatusParsed={setSpecStatus}
+      {/* ─── Single-column scrollable content ─────────────────────── */}
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-subtle">
+        <div className="max-w-3xl mx-auto px-6 py-4 pb-20 flex flex-col gap-6">
+
+          {/* ─── Tasks section (hero content) ──────────────────────── */}
+          <section>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="text-[10px] uppercase tracking-[0.12em] text-ink-ghost">
+                Tasks
+              </div>
+              <span className="text-[10px] text-ink-ghost tabular-nums font-mono">
+                {doneSiblingCount}/{allSiblings.length} done
+              </span>
+            </div>
+
+            <div className="h-[3px] rounded-full bg-inset overflow-hidden mb-3">
+              <div
+                className="h-full bg-sage-fill transition-all duration-300"
+                style={{ width: `${allSiblings.length > 0 ? (doneSiblingCount / allSiblings.length) * 100 : 0}%` }}
               />
-            )}
-          </div>
-        </div>
+            </div>
 
-        {/* ─── Right: Tasks + Notes ───────────────────────────────── */}
-        <div className="w-[340px] shrink-0 min-h-0 overflow-y-auto scrollbar-subtle">
-          <div className="px-4 py-4 pb-20 flex flex-col gap-6">
-
-            {/* Sibling loops list */}
-            {allSiblings.length > 1 && (
-              <section>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="text-[10px] uppercase tracking-[0.12em] text-ink-ghost">
-                    Tasks
-                  </div>
-                  <span className="text-[10px] text-ink-ghost tabular-nums font-mono">
-                    {doneSiblingCount}/{allSiblings.length} done
-                  </span>
-                </div>
-
-                <div className="h-[3px] rounded-full bg-inset overflow-hidden mb-3">
-                  <div
-                    className="h-full bg-sage-fill transition-all duration-300"
-                    style={{ width: `${allSiblings.length > 0 ? (doneSiblingCount / allSiblings.length) * 100 : 0}%` }}
-                  />
-                </div>
-
-                <ul className="flex flex-col gap-1">
-                  {[...allSiblings]
-                    .sort((a, b) => {
-                      if (a.done && !b.done) return 1;
-                      if (!a.done && b.done) return -1;
-                      return 0;
-                    })
-                    .map((sib) => {
-                      const isPicked = sib.id === loop.id;
-                      const sibEst = sib.timeEstimateMinutes;
-                      return (
-                        <li
-                          key={sib.id}
-                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] transition-colors cursor-pointer ${
-                            isPicked
-                              ? 'border border-[var(--sage)] bg-sage-fill/20'
-                              : 'border border-transparent hover:bg-inset/60'
-                          } ${sib.done ? 'opacity-50' : ''}`}
-                          onClick={() => {
-                            if (!sib.done && sib.id !== loop.id) {
-                              setPickedId(sib.id);
-                            }
-                          }}
-                        >
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!sib.done) void onCloseLoop(sib.id);
-                            }}
-                            className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center transition-colors ${
-                              sib.done
-                                ? 'bg-sage-fill border-[var(--sage)] text-sage-text'
-                                : 'border-edge hover:border-[var(--sage)]'
-                            }`}
-                            disabled={sib.done}
-                          >
-                            {sib.done && <span className="text-[8px]">&#10003;</span>}
-                          </button>
-
-                          <span className={`flex-1 min-w-0 truncate leading-snug ${
-                            sib.done ? 'line-through text-ink-ghost' : 'text-ink'
-                          }`}>
-                            {stripInlineMarkdown(sib.text)}
-                          </span>
-
-                          {!sib.done && (
-                            <span className={`w-[5px] h-[5px] rounded-full shrink-0 ${
-                              sib.blocked ? 'bg-[var(--rose)]' : 'bg-sage-fill'
-                            }`} />
-                          )}
-
-                          {sibEst != null && !sib.done && (
-                            <span className="text-[9px] text-ink-ghost font-mono tabular-nums shrink-0">
-                              {formatMinutes(sibEst)}
-                            </span>
-                          )}
-
-                          {isPicked && (
-                            <span className="text-[8px] text-sage-text font-medium shrink-0">
-                              ●
-                            </span>
-                          )}
-                        </li>
-                      );
-                    })}
-                </ul>
-              </section>
+            {allSiblings.length > 0 && doneSiblingCount === allSiblings.length && (
+              <div className="text-[12px] text-sage-text bg-sage-fill/20 rounded-md px-3 py-2 mb-3">
+                All tasks done — nice work.
+              </div>
             )}
 
-            {/* Notes */}
-            <FocusNotes
-              loop={loop}
-              notesRef={notesRef}
-              onUpdateLoop={onUpdateLoop}
+            <ul className="flex flex-col gap-1">
+              {[...allSiblings]
+                .sort((a, b) => {
+                  if (a.done && !b.done) return 1;
+                  if (!a.done && b.done) return -1;
+                  return 0;
+                })
+                .map((sib) => {
+                  const isPicked = sib.id === loop.id;
+                  const sibEst = sib.timeEstimateMinutes;
+                  return (
+                    <li
+                      key={sib.id}
+                      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] transition-colors cursor-pointer ${
+                        isPicked
+                          ? 'border border-[var(--sage)] bg-sage-fill/20'
+                          : 'border border-transparent hover:bg-inset/60'
+                      } ${sib.done ? 'opacity-50' : ''}`}
+                      onClick={() => {
+                        if (!sib.done && sib.id !== loop.id) {
+                          setPickedId(sib.id);
+                        }
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!sib.done) void onCloseLoop(sib.id);
+                        }}
+                        className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center transition-colors ${
+                          sib.done
+                            ? 'bg-sage-fill border-[var(--sage)] text-sage-text'
+                            : 'border-edge hover:border-[var(--sage)]'
+                        }`}
+                        disabled={sib.done}
+                      >
+                        {sib.done && <span className="text-[8px]">&#10003;</span>}
+                      </button>
+
+                      <span className={`flex-1 min-w-0 leading-snug ${
+                        sib.done ? 'line-through text-ink-ghost' : 'text-ink'
+                      }`}>
+                        {stripInlineMarkdown(sib.text)}
+                      </span>
+
+                      {!sib.done && (
+                        <span className={`w-[5px] h-[5px] rounded-full shrink-0 ${
+                          sib.blocked ? 'bg-[var(--rose)]' : 'bg-sage-fill'
+                        }`} />
+                      )}
+
+                      {sibEst != null && !sib.done && (
+                        <span className="text-[9px] text-ink-ghost font-mono tabular-nums shrink-0">
+                          {formatMinutes(sibEst)}
+                        </span>
+                      )}
+
+                      {isPicked && (
+                        <span className="text-[8px] text-sage-text font-medium shrink-0">
+                          ●
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+            </ul>
+          </section>
+
+          {/* ─── Notes section (always visible, full-width) ────────── */}
+          <FocusNotes
+            loop={loop}
+            notesRef={notesRef}
+            onUpdateLoop={onUpdateLoop}
+          />
+
+          {/* ─── Spec section (collapsible, collapsed by default) ──── */}
+          {sourceFile && (
+            <FocusSpecContent
+              filePath={sourceFile}
+              onStatusParsed={setSpecStatus}
+              collapsed={specCollapsed}
+              onToggleCollapse={() => setSpecCollapsed((c) => !c)}
             />
-          </div>
+          )}
         </div>
       </div>
 
@@ -964,14 +951,18 @@ function FocusNotes({
   );
 }
 
-// ─── Spec content area (full-context, with edit mode + vault links) ──────
+// ─── Spec content area (collapsible, with edit mode + vault links) ──────
 
 function FocusSpecContent({
   filePath: initialFilePath,
   onStatusParsed,
+  collapsed,
+  onToggleCollapse,
 }: {
   filePath: string;
   onStatusParsed?: (status: string | null) => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }) {
   const [filePath, setFilePath] = useState(initialFilePath);
   const [content, setContent] = useState<string | null>(null);
@@ -983,6 +974,8 @@ function FocusSpecContent({
   const [editBuffer, setEditBuffer] = useState('');
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [devInfo, setDevInfo] = useState<{ handoffBranch?: string; handoffDate?: string } | null>(null);
+  const [copiedBranch, setCopiedBranch] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1002,15 +995,31 @@ function FocusSpecContent({
     fetch(`/api/vault/read?${params}`)
       .then((r) => r.json())
       .then((data) => {
-        setContent(data.content || '');
-        setRawContent(data.content || '');
+        const body = data.content || '';
+        setContent(body);
+        setRawContent(body);
         setIsHtml(data.isHtml ?? filePath.endsWith('.html'));
         setLoading(false);
         scrollRef.current?.scrollTo(0, 0);
 
         if (filePath === initialFilePath && onStatusParsed) {
-          const statusMatch = (data.content || '').match(/^status:\s*(drafting|ready|building|shipped)/m);
+          const statusMatch = body.match(/^status:\s*(drafting|ready|building|shipped)/m);
           onStatusParsed(statusMatch ? statusMatch[1] : null);
+        }
+
+        // Parse dev info (handoff_branch + handoff_date) from content body
+        // These may appear as YAML-style fields in the body since frontmatter is stripped
+        if (filePath === initialFilePath) {
+          const branchMatch = body.match(/handoff_branch:\s*(.+)/);
+          const dateMatch = body.match(/handoff_date:\s*(.+)/);
+          if (branchMatch || dateMatch) {
+            setDevInfo({
+              handoffBranch: branchMatch ? branchMatch[1].trim() : undefined,
+              handoffDate: dateMatch ? dateMatch[1].trim() : undefined,
+            });
+          } else {
+            setDevInfo(null);
+          }
         }
       })
       .catch(() => {
@@ -1056,29 +1065,10 @@ function FocusSpecContent({
   };
 
   const stopEditing = async () => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     if (dirty) await doSave(editBuffer);
     setEditing(false);
   };
-
-  // Save handler
-  const saveEdit = useCallback(async () => {
-    setSaving(true);
-    try {
-      await fetch('/api/vault/write', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file: filePath, content: editBuffer }),
-      });
-      setContent(editBuffer);
-      setRawContent(editBuffer);
-      setDirty(false);
-      onStopEditing();
-    } catch {
-      console.error('Save failed');
-    } finally {
-      setSaving(false);
-    }
-  }, [filePath, editBuffer]);
 
   // Vault link navigation
   const handleContentClick = useCallback((e: React.MouseEvent) => {
@@ -1103,82 +1093,142 @@ function FocusSpecContent({
     }
   }, [history]);
 
-  if (loading) {
-    return (
-      <div className="text-[11px] text-ink-ghost animate-pulse pt-4">
-        Loading...
-      </div>
-    );
-  }
-
-  if (!content) return null;
+  const specFileName = initialFilePath.split('/').pop()?.replace(/\.md$/, '') ?? initialFilePath;
 
   return (
     <section ref={scrollRef}>
-      {/* Vault link history back */}
-      {history.length > 0 && (
-        <button
-          type="button"
-          onClick={goBack}
-          className="text-ink-ghost hover:text-ink text-[11px] px-1.5 py-0.5 rounded hover:bg-inset transition-colors mb-2"
-        >
-          &larr; Back to spec
-        </button>
+      {/* Collapsible header */}
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        className="flex items-center gap-2 w-full text-left group"
+      >
+        <span className="text-[10px] text-ink-ghost">
+          {collapsed ? '\u25B8' : '\u25BE'}
+        </span>
+        <span className="text-[10px] uppercase tracking-[0.12em] text-ink-ghost group-hover:text-ink-soft transition-colors">
+          {collapsed ? 'Show spec' : 'Hide spec'}
+        </span>
+        <span className="text-[10px] text-ink-ghost truncate">
+          {specFileName}
+        </span>
+      </button>
+
+      {!collapsed && (
+        <div className="mt-3">
+          {loading ? (
+            <div className="text-[11px] text-ink-ghost animate-pulse pt-2">
+              Loading...
+            </div>
+          ) : !content ? null : (
+            <>
+              {/* Vault link history back */}
+              {history.length > 0 && (
+                <button
+                  type="button"
+                  onClick={goBack}
+                  className="text-ink-ghost hover:text-ink text-[11px] px-1.5 py-0.5 rounded hover:bg-inset transition-colors mb-2"
+                >
+                  &larr; Back to spec
+                </button>
+              )}
+
+              {isHtml ? (
+                <iframe
+                  srcDoc={content}
+                  className="w-full border border-edge rounded-lg min-h-[60vh]"
+                  sandbox="allow-scripts allow-same-origin"
+                  title="Spec content"
+                />
+              ) : editing ? (
+                <div className="relative">
+                  <textarea
+                    ref={textareaRef}
+                    value={editBuffer}
+                    onChange={(e) => { setEditBuffer(e.target.value); setDirty(true); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault();
+                        if (dirty) void doSave(editBuffer);
+                      }
+                      if (e.key === 'Escape') {
+                        e.preventDefault();
+                        void stopEditing();
+                      }
+                    }}
+                    onBlur={() => void stopEditing()}
+                    className="w-full min-h-[60vh] text-[12px] text-ink font-mono leading-relaxed bg-surface border-none rounded-lg px-4 py-3 outline-none resize-none"
+                    spellCheck={false}
+                  />
+                  <div className="absolute top-2 right-2 flex items-center gap-1.5 pointer-events-none">
+                    {saving && <span className="text-[9px] text-sage-text">saving...</span>}
+                    {dirty && !saving && <span className="text-[9px] text-ink-ghost">auto-saves</span>}
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    const link = target.closest('a[data-vault-link]') as HTMLAnchorElement | null;
+                    if (link) {
+                      handleContentClick(e);
+                      return;
+                    }
+                    startEditing();
+                  }}
+                  className="cursor-text hover:bg-inset/30 rounded-lg transition-colors -mx-2 px-2 py-1"
+                  title="Click to edit — changes save to Obsidian"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
+                />
+              )}
+            </>
+          )}
+        </div>
       )}
 
-      {isHtml ? (
-        <iframe
-          srcDoc={content}
-          className="w-full border border-edge rounded-lg min-h-[60vh]"
-          sandbox="allow-scripts allow-same-origin"
-          title="Spec content"
-        />
-      ) : editing ? (
-        <div className="relative">
-          <textarea
-            ref={textareaRef}
-            value={editBuffer}
-            onChange={(e) => { setEditBuffer(e.target.value); setDirty(true); }}
-            onKeyDown={(e) => {
-              if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                if (dirty) void doSave(editBuffer);
-              }
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                void stopEditing();
-              }
-            }}
-            className="w-full min-h-[60vh] text-[12px] text-ink font-mono leading-relaxed bg-surface border-none rounded-lg px-4 py-3 outline-none resize-none"
-            spellCheck={false}
-          />
-          <div className="absolute top-2 right-2 flex items-center gap-1.5">
-            {saving && <span className="text-[9px] text-sage-text">saving...</span>}
-            {dirty && !saving && <span className="text-[9px] text-ink-ghost">auto-saves</span>}
-            <button
-              type="button"
-              onClick={() => void stopEditing()}
-              className="text-[9px] text-ink-ghost hover:text-ink-soft px-1.5 py-0.5 rounded hover:bg-inset transition-colors"
-            >
-              done editing
-            </button>
+      {/* ─── Dev info section ──────────────────────────────────────── */}
+      {devInfo && (devInfo.handoffBranch || devInfo.handoffDate) && (
+        <div className="mt-4 px-3 py-2 rounded-md bg-inset border-[0.5px] border-edge">
+          <div className="text-[10px] uppercase tracking-[0.12em] text-ink-ghost mb-1.5">
+            Dev info
           </div>
+          {devInfo.handoffBranch && (
+            <div className="flex items-center gap-2 mb-1">
+              <code className="text-[11px] font-mono text-ink bg-surface px-1.5 py-0.5 rounded">
+                {devInfo.handoffBranch}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(devInfo.handoffBranch!);
+                  setCopiedBranch(true);
+                  setTimeout(() => setCopiedBranch(false), 1500);
+                }}
+                className="text-[9px] text-ink-ghost hover:text-ink-soft transition-colors"
+                title="Copy branch name"
+              >
+                {copiedBranch ? 'copied' : 'copy'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(`git diff main..${devInfo.handoffBranch}`);
+                  setCopiedBranch(true);
+                  setTimeout(() => setCopiedBranch(false), 1500);
+                }}
+                className="text-[9px] text-ink-ghost hover:text-ink-soft transition-colors"
+                title="Copy diff command"
+              >
+                review diff
+              </button>
+            </div>
+          )}
+          {devInfo.handoffDate && (
+            <div className="text-[10px] text-ink-ghost">
+              Handed off {devInfo.handoffDate}
+            </div>
+          )}
         </div>
-      ) : (
-        <div
-          onClick={(e) => {
-            const target = e.target as HTMLElement;
-            const link = target.closest('a[data-vault-link]') as HTMLAnchorElement | null;
-            if (link) {
-              handleContentClick(e);
-              return;
-            }
-            startEditing();
-          }}
-          className="cursor-text hover:bg-inset/30 rounded-lg transition-colors -mx-2 px-2 py-1"
-          title="Click to edit — changes save to Obsidian"
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
-        />
       )}
     </section>
   );
