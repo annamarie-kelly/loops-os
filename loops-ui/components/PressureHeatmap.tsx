@@ -1,12 +1,13 @@
 'use client';
 
 // PressureHeatmap: 30-day calendar grid of daily checkpoints.
-// Each cell gets a semantic color based on the pressure value:
-//   chose       → sage
-//   reactive    → tan
-//   task_monkey → rose
-//   skipped     → edge (muted)
-//   none        → inset (empty)
+// Each cell gets a semantic color based on the work-type value:
+//   building   → sage
+//   improving  → mauve
+//   fixing     → tan
+//   supporting → rose
+//   skipped    → edge (muted)
+//   none       → inset (empty)
 //
 // Clicking a cell surfaces that day's full checkpoint via onSelect.
 
@@ -26,13 +27,19 @@ function cellAccent(cp: Checkpoint | undefined): {
 } {
   if (!cp) return { fill: 'var(--surface-inset)', border: 'var(--border-subtle)', label: 'no data' };
   if (cp.skipped) return { fill: 'var(--border-subtle)', border: 'var(--border-default)', label: 'skipped' };
-  switch (cp.pressure) {
+  const primary = Array.isArray(cp.pressure) ? cp.pressure[0] : cp.pressure;
+  switch (primary) {
+    case 'building':
     case 'chose':
-      return { fill: 'var(--sage-fill)', border: 'var(--sage)', label: 'chose' };
+      return { fill: 'var(--sage-fill)', border: 'var(--sage)', label: 'building' };
+    case 'improving':
+      return { fill: 'var(--mauve-fill)', border: 'var(--mauve)', label: 'improving' };
+    case 'fixing':
     case 'reactive':
-      return { fill: 'var(--tan-fill)', border: 'var(--tan)', label: 'reactive' };
+      return { fill: 'var(--tan-fill)', border: 'var(--tan)', label: 'fixing' };
+    case 'supporting':
     case 'task_monkey':
-      return { fill: 'var(--rose-fill)', border: 'var(--rose)', label: 'task-monkey' };
+      return { fill: 'var(--rose-fill)', border: 'var(--rose)', label: 'supporting' };
     default:
       return { fill: 'var(--surface-inset)', border: 'var(--border-default)', label: 'incomplete' };
   }
@@ -81,9 +88,10 @@ export function PressureHeatmap({
         })}
       </div>
       <div className="flex items-center gap-4 text-[10px] text-ink-ghost">
-        <LegendDot color="var(--sage)" label="chose" />
-        <LegendDot color="var(--tan)" label="reactive" />
-        <LegendDot color="var(--rose)" label="task-monkey" />
+        <LegendDot color="var(--sage)" label="building" />
+        <LegendDot color="var(--mauve)" label="improving" />
+        <LegendDot color="var(--tan)" label="fixing" />
+        <LegendDot color="var(--rose)" label="supporting" />
         <LegendDot color="var(--border-default)" label="skipped" />
       </div>
     </div>

@@ -25,7 +25,7 @@ import {
 
 const LEFT_RAIL_PX = 52;
 const HEADER_ROW_PX = 40;
-const MIN_PX_PER_MIN = 0.7;
+const MIN_PX_PER_MIN = 1.0;
 const MAX_PX_PER_MIN = 1.6;
 
 // Horizontal gap between adjacent lanes so borders don't touch.
@@ -185,20 +185,27 @@ export function WeekCanvas({
     return () => window.removeEventListener('resize', recompute);
   }, []);
 
-  // Auto-scroll horizontally so today's column is centered on mount and
-  // whenever the mode flips back to plan. On most screens all seven columns
-  // fit without horizontal scroll so this is a no-op, but the hook guarantees
-  // correct behavior on narrow viewports.
+  // Auto-scroll so the current time is visible on mount. Scrolls
+  // vertically to center the "now" line and horizontally to center
+  // today's column.
   useEffect(() => {
     const grid = gridRef.current;
     if (!grid) return;
+    // Horizontal: center today's column.
     const todayIdx = days.indexOf(today);
-    if (todayIdx < 0) return;
-    // Center today's column if there is overflow.
-    const col = grid.children[todayIdx] as HTMLElement | undefined;
-    if (col && grid.scrollWidth > grid.clientWidth) {
-      const target = col.offsetLeft - (grid.clientWidth - col.clientWidth) / 2;
-      grid.scrollTo({ left: Math.max(0, target), behavior: 'auto' });
+    if (todayIdx >= 0) {
+      const col = grid.children[todayIdx] as HTMLElement | undefined;
+      if (col && grid.scrollWidth > grid.clientWidth) {
+        const target = col.offsetLeft - (grid.clientWidth - col.clientWidth) / 2;
+        grid.scrollTo({ left: Math.max(0, target), behavior: 'auto' });
+      }
+    }
+    // Vertical: scroll the parent so the current time is visible.
+    const parent = grid.parentElement;
+    if (parent && nowInRange) {
+      const pct = (nowMin - DAY_START_MIN) / DAY_TOTAL_MIN;
+      const targetY = pct * canvasHeightPx - parent.clientHeight / 3;
+      parent.scrollTo({ top: Math.max(0, targetY), behavior: 'auto' });
     }
   }, [mode, days, today]);
 
@@ -287,7 +294,7 @@ export function WeekCanvas({
       {/* Canvas body: left rail + 7 day columns */}
       <div
         ref={gridRef}
-        className="flex-1 min-h-0 flex overflow-x-auto overflow-y-hidden"
+        className="flex-1 min-h-0 flex overflow-x-auto overflow-y-auto"
         style={{ paddingTop: '4px' }}
       >
         {/* Left rail with hour labels. Shared across all columns. */}

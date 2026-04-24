@@ -1,6 +1,6 @@
 export type Tier = 'now' | 'soon' | 'someday';
 
-export type Domain = 'building' | 'thinking' | 'working' | 'living' | 'relating';
+export type Domain = string;
 
 export interface Timeblock {
   date: string; // ISO date "YYYY-MM-DD"
@@ -243,7 +243,7 @@ export interface Checkpoint {
   completed_at?: string;
   skipped: boolean;
   loops_touched: CheckpointTouchedLoop[];
-  pressure: 'chose' | 'reactive' | 'task_monkey' | null;
+  pressure: string[] | null;
   tomorrow_intent: string[];
 }
 
@@ -269,6 +269,53 @@ export type WorkMode =
   | 'research'
   | 'ops'
   | 'unsorted';
+
+// ─── Mission Control: Research Shelf ───────────────────────────────
+export type ResearchCategory =
+  | 'strategic-research'
+  | 'technical-investigation'
+  | 'foundational'
+  | 'design-research'
+  | 'artifact';
+
+export interface ResearchDoc {
+  id: string;
+  title: string;
+  summary: string;
+  filePath: string;
+  category: ResearchCategory;
+  createdAt: string;
+  updatedAt: string;
+  staleDays: number;
+  tags: string[];
+  type: string;
+  status: string;
+  sizeBytes: number;
+  openTaskCount: number;
+  favorite: boolean;
+  /** true for .html visual artifacts (rendered in iframe, not markdown) */
+  isHtml?: boolean;
+}
+
+// ─── Mission Control: Design Bench ─────────────────────────────────
+export type SpecStatus = 'drafting' | 'ready' | 'building' | 'shipped';
+
+export interface SpecDoc {
+  id: string;
+  title: string;
+  filePath: string;
+  status: SpecStatus;
+  effortEstimate: string | null;
+  openQuestions: string[];
+  createdAt: string;
+  updatedAt: string;
+  staleDays: number;
+  sourceResearch: string[];
+  linkedLoopCount: number;
+  sizeBytes: number;
+  /** true for .html visual artifacts (rendered in iframe, not markdown) */
+  isHtml?: boolean;
+}
 
 export interface LoopsFile {
   lastScanned: string;
@@ -406,12 +453,11 @@ export interface ContextFile {
   available: boolean;
 }
 
-export const DOMAIN_EMOJI: Record<Domain, string> = {
-  building: '🔨',
-  thinking: '🧠',
-  working: '📋',
-  living: '🏠',
-  relating: '👤',
+// Map your domains to emojis — customize to taste
+export const DOMAIN_EMOJI: Record<string, string> = {
+  personal: '❤️',
+  work: '💼',
+  project: '🌷',
 };
 
 // Tier ids stay 'now' | 'soon' | 'someday' so persisted state keeps
@@ -450,17 +496,15 @@ export function todayISO(): string {
   return `${y}-${m}-${day}`;
 }
 
-// Returns an array of 5 ISO dates for the work week (Monday to Friday).
-// On weekends, returns the upcoming work week.
+// Returns an array of 7 ISO dates for the full week (Monday to Sunday).
 export function weekDates(reference: Date = new Date()): string[] {
   const ref = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
   const dow = ref.getDay(); // 0 = Sunday, 6 = Saturday
   const monday = new Date(ref);
-  if (dow === 0) monday.setDate(ref.getDate() + 1);      // Sun → next Mon
-  else if (dow === 6) monday.setDate(ref.getDate() + 2); // Sat → next Mon
+  if (dow === 0) monday.setDate(ref.getDate() - 6);      // Sun → prev Mon
   else monday.setDate(ref.getDate() - (dow - 1));        // anchor to this Mon
   const out: string[] = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
     const y = d.getFullYear();

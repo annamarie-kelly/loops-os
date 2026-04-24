@@ -44,15 +44,17 @@ const LOOPS_JSON = path.join(VAULT, '06-Loops/loops.json');
 
 const SCAN_DIRS = [
   '00-Inbox',
-  '01-Building',
+  '01-Creating',
   '02-Thinking',
-  '03-Working',
-  '04-Living',
-  '05-Relating',
+  '03-Living',
+  '04-Relating',
+  'inbox',
 ];
 const SKIP_SEGMENTS = new Set([
   'Templates',
+  'templates',
   'assets',
+  '05-Archive',
   '07-Archive',
   '06-Loops',
   '.claude',
@@ -246,17 +248,24 @@ function classifyWorkMode(title, subGroup) {
   return 'unsorted';
 }
 
-function domainFromFile(rel) {
+function domainFromFile(rel, text) {
+  const lower = (rel + ' ' + (text || '')).toLowerCase();
+
+  // Keyword-based: customize these patterns to match your projects
+  // Example: if (/\b(myproject|deploy|backend)\b/.test(lower)) return 'work';
+
+  // Folder-based fallback — maps vault folders to domains
   const seg = rel.split('/')[0];
   return (
     {
-      '00-Inbox': 'working',
-      '01-Building': 'building',
-      '02-Thinking': 'thinking',
-      '03-Working': 'working',
-      '04-Living': 'living',
-      '05-Relating': 'relating',
-    }[seg] ?? 'working'
+      '00-Inbox': 'personal',
+      '01-Building': 'project',
+      '02-Thinking': 'project',
+      '03-Working': 'work',
+      '04-Living': 'personal',
+      '05-Relating': 'personal',
+      'inbox': 'personal',
+    }[seg] ?? 'personal'
   );
 }
 
@@ -323,7 +332,7 @@ function scanFile(absPath, relPath) {
       difficulty,
       timeEstimateMinutes,
       subGroup,
-      domain: domainFromFile(relPath),
+      domain: domainFromFile(relPath, rawText),
       sourceFile: relPath,
       sourceLine: i + 1,
       workMode,

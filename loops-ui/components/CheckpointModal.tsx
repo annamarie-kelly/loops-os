@@ -26,37 +26,45 @@ import {
   writeCheckpoint,
 } from '@/lib/tend';
 import { P1_STAKEHOLDER } from '@/lib/config';
+import { renderInlineMarkdown } from '@/lib/markdown';
 
 const CHECKPOINT_HOUR = 15; // 3pm local — moved earlier so it lands before logoff
 const SKIP_HOUR = 16; // 4pm local — CheckpointSkipBanner takes over after this
 const LS_FORCE_OPEN = 'loops-ui:tend:checkpoint_force_open';
 
-type Pressure = 'chose' | 'reactive' | 'task_monkey';
+type PressureKey = 'building' | 'improving' | 'fixing' | 'supporting';
 
 const PRESSURE_OPTIONS: {
-  key: Pressure;
+  key: PressureKey;
   label: string;
   accent: string;
   fill: string;
   text: string;
 }[] = [
   {
-    key: 'chose',
-    label: 'I chose my work today',
+    key: 'building',
+    label: 'Building new things',
     accent: 'var(--sage)',
     fill: 'bg-sage-fill',
     text: 'text-sage-text',
   },
   {
-    key: 'reactive',
-    label: 'Mostly reactive',
+    key: 'improving',
+    label: 'Improving what exists',
+    accent: 'var(--mauve)',
+    fill: 'bg-mauve-fill',
+    text: 'text-mauve-text',
+  },
+  {
+    key: 'fixing',
+    label: 'Fixing & debugging',
     accent: 'var(--tan)',
     fill: 'bg-tan-fill',
     text: 'text-tan-text',
   },
   {
-    key: 'task_monkey',
-    label: 'Task-monkey mode',
+    key: 'supporting',
+    label: 'Supporting & responding',
     accent: 'var(--rose)',
     fill: 'bg-rose-fill',
     text: 'text-rose-text',
@@ -211,15 +219,18 @@ export function CheckpointModal({
     }
   }, [forced, pastCheckpoint, pastSkip, existing, open]);
 
-  // Clear the force flag when the modal actually closes — either
-  // after submit (completed_at is set) or explicit cancel.
+  // Clear the force flag when the modal transitions from open → closed
+  // (after submit or cancel). We track the previous open state to avoid
+  // clearing forced before the modal ever opens.
+  const prevOpenRef = useRef(false);
   useEffect(() => {
-    if (!open && forced) {
+    if (prevOpenRef.current && !open && forced) {
       try {
         window.localStorage.removeItem(LS_FORCE_OPEN);
       } catch {}
       setForced(false);
     }
+    prevOpenRef.current = open;
   }, [open, forced]);
 
   // Release the lock on unmount.
@@ -235,12 +246,14 @@ export function CheckpointModal({
     if (open) setTouched(pickTouchedLoops(loops, today));
   }, [open, loops, today]);
 
-  const [pressure, setPressure] = useState<Pressure | null>(null);
+  const [pressure, setPressure] = useState<Set<PressureKey>>(new Set());
   const [selectedIntent, setSelectedIntent] = useState<Set<string>>(new Set());
+  const [freeIntentText, setFreeIntentText] = useState('');
   useEffect(() => {
     if (open) {
-      setPressure(null);
+      setPressure(new Set());
       setSelectedIntent(new Set());
+      setFreeIntentText('');
     }
   }, [open]);
 
@@ -255,7 +268,7 @@ export function CheckpointModal({
 
   if (!open) return null;
 
-  const canSubmit = pressure != null && selectedIntent.size >= 1;
+  const canSubmit = pressure.size > 0;
 
   const toggleIntent = (id: string) => {
     setSelectedIntent((prev) => {
@@ -277,14 +290,17 @@ export function CheckpointModal({
   };
 
   const submit = () => {
-    if (!canSubmit || !pressure) return;
+    if (!canSubmit || pressure.size === 0) return;
     const cp: Checkpoint = {
       date: today,
       completed_at: new Date().toISOString(),
       skipped: false,
       loops_touched: touched,
-      pressure,
-      tomorrow_intent: [...selectedIntent],
+      pressure: [...pressure],
+      tomorrow_intent: [
+        ...selectedIntent,
+        ...freeIntentText.trim().split('\n').map(s => s.trim()).filter(Boolean),
+      ],
     };
     writeCheckpoint(cp);
     releaseCheckpointLock(tabIdRef.current);
@@ -364,16 +380,21 @@ export function CheckpointModal({
           {/* Section 2 — Pressure check */}
           <section className="px-6 py-5 border-b border-edge-subtle">
             <div className="text-[10px] uppercase tracking-[0.08em] text-ink-ghost mb-3">
-              2 · Pressure check <span className="text-rose-text">*</span>
+              2 · What kind of work? <span className="text-rose-text">*</span>
             </div>
             <div className="flex flex-col gap-2">
               {PRESSURE_OPTIONS.map((opt) => {
-                const active = pressure === opt.key;
+                const active = pressure.has(opt.key);
                 return (
                   <button
                     key={opt.key}
                     type="button"
-                    onClick={() => setPressure(opt.key)}
+                    onClick={() => setPressure((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(opt.key)) next.delete(opt.key);
+                      else next.add(opt.key);
+                      return next;
+                    })}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-md border-[0.5px] transition-all text-left ${
                       active
                         ? `${opt.fill} ${opt.text} border-[${opt.accent}]/60 shadow-[inset_0_0_0_1px_${opt.accent}]`
@@ -449,7 +470,7 @@ export function CheckpointModal({
                           )}
                         </span>
                         <span className="flex-1 min-w-0 text-[12px] truncate">
-                          {l.text}
+                          {renderInlineMarkdown(l.text)}
                         </span>
                         {l.pLevel && (
                           <span className="text-[9px] font-mono text-ink-ghost shrink-0">
@@ -465,12 +486,19 @@ export function CheckpointModal({
             <div className="text-[10px] text-ink-ghost tabular-nums font-mono mt-1.5">
               {selectedIntent.size}/3 selected
             </div>
+            <textarea
+              value={freeIntentText}
+              onChange={(e) => setFreeIntentText(e.target.value)}
+              placeholder="or type tomorrow's intent here (one per line)"
+              rows={2}
+              className="mt-3 w-full text-[12px] bg-inset border border-edge rounded-md px-3 py-2 text-ink placeholder:text-ink-ghost/50 focus:outline-none focus:ring-1 focus:ring-[var(--slate)] resize-none"
+            />
           </section>
         </div>
 
         <div className="px-6 py-3 border-t border-edge-subtle flex items-center justify-between shrink-0">
           <div className="text-[10px] text-ink-ghost">
-            {canSubmit ? 'Ready' : 'Section 2 + at least one intent required'}
+            {canSubmit ? 'Ready' : 'Pick a pressure read above to continue'}
           </div>
           <button
             type="button"

@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CloseOutCheckStatus, CloseOutEntry, Loop } from '@/lib/types';
 import { appendCloseOut, detectFollowThroughKeywords } from '@/lib/tend';
 import { STAKEHOLDERS } from '@/lib/ui';
+import { renderInlineMarkdown } from '@/lib/markdown';
 
 type CheckKey = 'docs' | 'stakeholder' | 'artifact' | 'follow_through';
 
@@ -251,7 +252,7 @@ export function CloseGateModal({
             </span>
           </div>
           <div className="text-[14px] text-ink font-medium leading-snug">
-            {loop.text}
+            {renderInlineMarkdown(loop.text)}
           </div>
         </div>
 

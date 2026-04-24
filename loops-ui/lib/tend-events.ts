@@ -122,7 +122,7 @@ export interface SnoozeLoopPayload {
 
 export interface LogCheckpointPayload {
   date?: string;
-  pressure: 'chose' | 'reactive' | 'task_monkey';
+  pressure: 'building' | 'improving' | 'fixing' | 'supporting' | 'chose' | 'reactive' | 'task_monkey';
   tomorrow_intent?: string[];
   loops_touched?: Checkpoint['loops_touched'];
   annotation?: string;
@@ -408,7 +408,7 @@ const createLoopHandler: EventHandler<Extract<TendEvent, { kind: 'create_loop' }
     difficulty: null,
     timeEstimateMinutes: p.timeEstimateMinutes ?? null,
     subGroup: p.subGroup ?? null,
-    domain: 'building',
+    domain: 'personal',
     source: { file: sourceFile, line: sourceLine },
     timeblocks: p.timeblock ? [p.timeblock] : [],
     done: false,
@@ -968,7 +968,7 @@ const logCheckpointHandler: EventHandler<
     actor,
     kind: 'log_checkpoint',
     result: 'applied',
-    summary: `${event.payload.date ?? todayLocal()} ${event.payload.pressure}`,
+    summary: `${event.payload.date ?? todayLocal()} ${Array.isArray(event.payload.pressure) ? event.payload.pressure.join('+') : event.payload.pressure}`,
     context: {
       tomorrow_intent: event.payload.tomorrow_intent,
       source: event.payload.source,
@@ -1312,7 +1312,7 @@ async function appendCheckpointToFile(
     completed_at: new Date().toISOString(),
     skipped: false,
     loops_touched: payload.loops_touched ?? [],
-    pressure: payload.pressure,
+    pressure: Array.isArray(payload.pressure) ? payload.pressure : payload.pressure ? [payload.pressure] : null,
     tomorrow_intent: payload.tomorrow_intent ?? [],
   };
   const tmp = `${file}.tmp`;

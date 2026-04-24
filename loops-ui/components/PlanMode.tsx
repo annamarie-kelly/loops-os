@@ -9,7 +9,7 @@
 // ratio. Double-click the handle to reset to the default 340px.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CalendarFile, Loop } from '@/lib/types';
+import type { CalendarFile, Loop, SpecDoc } from '@/lib/types';
 import { LoopDrawer } from './LoopDrawer';
 import { WeekCanvas } from './WeekCanvas';
 
@@ -20,6 +20,7 @@ const MAX_SIDEBAR_WIDTH = 520;
 
 export function PlanMode({
   loops,
+  specs,
   weekBlocks,
   committedMinutes,
   calendar,
@@ -42,6 +43,7 @@ export function PlanMode({
   onQuickSchedule,
 }: {
   loops: Loop[];
+  specs?: SpecDoc[];
   weekBlocks: Loop[];
   committedMinutes: number;
   calendar: CalendarFile | null;
@@ -139,17 +141,10 @@ export function PlanMode({
     >
       <div className="relative min-w-0 h-full">
         {sidebarCollapsed ? (
-          <div className="h-full w-[44px] bg-page border-r border-edge flex flex-col items-center py-3 gap-2">
-            <img
-              src="/icon_v5_cream_on_mauve.png"
-              alt="Tend"
-              width={24}
-              height={24}
-              className="rounded-md mb-1"
-            />
+          <div className="h-full w-[24px] bg-page border-r border-edge flex flex-col items-center pt-3">
             <button
               onClick={onToggleCollapse}
-              className="w-8 h-8 rounded-md hover:bg-inset text-ink-ghost hover:text-ink-soft flex items-center justify-center text-[14px]"
+              className="w-6 h-6 rounded-md hover:bg-inset text-ink-ghost hover:text-ink-soft flex items-center justify-center text-[14px]"
               title="Expand sidebar (])"
               aria-label="Expand sidebar"
             >
@@ -160,6 +155,7 @@ export function PlanMode({
           <>
             <LoopDrawer
               loops={loops}
+              specs={specs}
               selectedIds={selectedIds}
               focusedId={focusedId}
               editingId={editingId}

@@ -19,6 +19,8 @@ import type {
   ContextFile,
   Loop,
   LoopsFile,
+  ResearchDoc,
+  SpecDoc,
   Tier,
   Timeblock,
 } from '@/lib/types';
@@ -49,7 +51,12 @@ import { ReflectionView } from '@/components/ReflectionView';
 import { AdoptLoopDialog } from '@/components/AdoptLoopDialog';
 import { TriageView } from '@/components/TriageView';
 import { SomedayView } from '@/components/SomedayView';
+import { ResearchShelf } from '@/components/ResearchShelf';
+import { DesignBench } from '@/components/DesignBench';
+import { DesignBoard } from '@/components/DesignBoard';
+import { PlanHub } from '@/components/PlanHub';
 import { TriageMigrationModal } from '@/components/TriageMigrationModal';
+import { ClaudeChat } from '@/components/ClaudeChat';
 import { appendBoundaryLog } from '@/lib/tend';
 import {
   checkCapacityGate,
@@ -71,6 +78,7 @@ export default function Page() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addingTier, setAddingTier] = useState<Tier | null>(null);
   const [mode, setMode] = useState<Mode>('focus');
+  const [focusInitialPickId, setFocusInitialPickId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>('default');
   const [filterPBuckets, setFilterPBuckets] = useState<Set<string>>(new Set());
   const [filterStakeholders, setFilterStakeholders] = useState<Set<string>>(new Set());
@@ -82,6 +90,7 @@ export default function Page() {
   // ─── Tend self-protection layer surfaces ─────────────────────────
   const [boundaryPanelOpen, setBoundaryPanelOpen] = useState(false);
   const [adoptOpen, setAdoptOpen] = useState(false);
+  const [claudeChatOpen, setClaudeChatOpen] = useState(false);
   const [capacityGate, setCapacityGate] = useState<{
     open: boolean;
     kind: 'P1:stakeholder' | 'P1:self' | 'P1-cap' | 'P2-cap';
@@ -91,6 +100,65 @@ export default function Page() {
     pending: Omit<Loop, 'id'> | null;
   }>({ open: false, kind: 'P1:stakeholder', currentCount: 0, max: 0, pending: null });
   const pendingPromotionIdRef = useRef<string | null>(null);
+
+  // ─── Mission Control: Research Shelf ────────────────────────────
+  const [researchDocs, setResearchDocs] = useState<ResearchDoc[]>([]);
+  const researchFetcher = useCallback(
+    async (signal: AbortSignal) => {
+      const res = await fetch('/api/vault/research', {
+        cache: 'no-cache',
+        signal,
+      });
+      if (res.status === 304) return null;
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json.docs as ResearchDoc[];
+    },
+    [],
+  );
+  // Poll research docs every 30s (less frequent than loops since vault
+  // files change slowly). Only poll when in research mode.
+  const { data: polledResearch } = useVisiblePoll<ResearchDoc[]>(
+    researchFetcher,
+    30_000,
+    mode === 'research',
+  );
+  useEffect(() => {
+    if (polledResearch) setResearchDocs(polledResearch);
+  }, [polledResearch]);
+
+  // ─── Mission Control: Design Bench ──────────────────────────────
+  const [specDocs, setSpecDocs] = useState<SpecDoc[]>([]);
+  const specsFetcher = useCallback(
+    async (signal: AbortSignal) => {
+      const res = await fetch('/api/vault/specs', {
+        cache: 'no-cache',
+        signal,
+      });
+      if (res.status === 304) return null;
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json.specs as SpecDoc[];
+    },
+    [],
+  );
+  const specWriteInFlightRef = useRef(0);
+  const { data: polledSpecs } = useVisiblePoll<SpecDoc[]>(
+    specsFetcher,
+    30_000,
+    mode === 'design',
+  );
+  useEffect(() => {
+    if (polledSpecs && specWriteInFlightRef.current === 0) setSpecDocs(polledSpecs);
+  }, [polledSpecs]);
+
+  const refetchSpecs = useCallback(async () => {
+    const res = await fetch('/api/vault/specs', { cache: 'no-cache' });
+    if (res.ok) {
+      const json = await res.json();
+      setSpecDocs(json.specs as SpecDoc[]);
+    }
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -313,7 +381,7 @@ export default function Page() {
     return data.loops.filter((l) => {
       if (l.done) return false;
       if (l.status === 'someday') return false;
-      if (l.status === 'triage' && l.timeblocks.length === 0) return false;
+      if (l.status === 'triage' && (l.timeblocks?.length ?? 0) === 0) return false;
       return true;
     });
   }, [data]);
@@ -842,6 +910,12 @@ export default function Page() {
         setAdoptOpen(true);
         return;
       }
+      // ⌘⇧C opens the Claude chat panel.
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
+        e.preventDefault();
+        setClaudeChatOpen((v) => !v);
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault();
         setSearchOpen((v) => !v);
@@ -957,7 +1031,8 @@ export default function Page() {
         }
         case 'Escape': {
           e.preventDefault();
-          if (detailId) setDetailId(null);
+          if (claudeChatOpen) { setClaudeChatOpen(false); }
+          else if (detailId) setDetailId(null);
           else clearSelection();
           break;
         }
@@ -981,7 +1056,7 @@ export default function Page() {
   const weekBlocks = useMemo(() => {
     if (!data) return [] as Loop[];
     const week = new Set(weekDates(new Date()));
-    return data.loops.filter((l) => l.timeblocks.some((tb) => week.has(tb.date)));
+    return data.loops.filter((l) => (l.timeblocks ?? []).some((tb) => week.has(tb.date)));
   }, [data]);
 
   // Committed minutes is still today-only. The rest of the week is shown
@@ -1032,7 +1107,9 @@ export default function Page() {
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div
         className={`h-screen max-h-screen bg-page text-ink flex flex-col overflow-hidden transition-[padding] duration-200 ${
-          detailId ? 'min-[1400px]:pr-[420px]' : ''
+          detailId && !claudeChatOpen ? 'min-[1400px]:pr-[420px]' : ''
+        } ${
+          claudeChatOpen ? 'pr-[440px]' : ''
         }`}
       >
         <Header
@@ -1096,34 +1173,206 @@ export default function Page() {
             onDropLoop={killLoop}
             onSplitBlock={splitBlockAt}
             onRemoveBlock={removeBlockAt}
-          />
-        ) : mode === 'plan' ? (
-          <PlanMode
-            loops={activeLoops}
-            weekBlocks={weekBlocks}
-            mode={mode}
-            committedMinutes={committedMinutes}
-            calendar={calendar}
-            draggingLoop={draggingLoop}
-            draggingBlockIdx={draggingBlockIdx}
-            selectedIds={selectedIds}
-            focusedId={focusedId}
-            editingId={editingId}
-            sidebarCollapsed={sidebarCollapsed}
-            onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
-            onToggleSelect={toggleSelect}
-            onStartEdit={setEditingId}
-            onCancelEdit={() => setEditingId(null)}
-            onSaveEdit={async (id, patch) => {
-              await updateLoop(id, patch);
-              setEditingId(null);
+            initialPickId={focusInitialPickId}
+            onClearInitialPick={() => setFocusInitialPickId(null)}
+            onPlanViaChat={(title) => {
+              setClaudeChatOpen(true);
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('claude-chat:send', { detail: { prompt: `/plan ${title}` } }));
+              }, 200);
             }}
-            onClearTimeblock={(id) => setLoopTimeblocks(id, [])}
-            onOpenDetail={(id) => setDetailId(id)}
-            onCreate={createLoop}
-            onKill={killLoop}
-            onQuickSchedule={addToNextOpenSlot}
+            onSpecViaChat={(fp) => {
+              setClaudeChatOpen(true);
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('claude-chat:send', { detail: { prompt: `/spec ${fp}` } }));
+              }, 200);
+            }}
+            onDecomposeViaChat={(fp) => {
+              setClaudeChatOpen(true);
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('claude-chat:send', { detail: { prompt: `/decompose ${fp}` } }));
+              }, 200);
+            }}
+            onHandoffViaChat={(fp) => {
+              setClaudeChatOpen(true);
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('claude-chat:send', { detail: { prompt: `/handoff ${fp}` } }));
+              }, 200);
+            }}
           />
+        ) : mode === 'plan' || mode === 'research' || mode === 'design' || mode === 'ship' ? (
+          <PlanHub activeTab={mode} onSetTab={setMode}>
+            {mode === 'plan' ? (
+              <PlanMode
+                loops={activeLoops}
+                specs={specDocs}
+                weekBlocks={weekBlocks}
+                mode={mode}
+                committedMinutes={committedMinutes}
+                calendar={calendar}
+                draggingLoop={draggingLoop}
+                draggingBlockIdx={draggingBlockIdx}
+                selectedIds={selectedIds}
+                focusedId={focusedId}
+                editingId={editingId}
+                sidebarCollapsed={sidebarCollapsed}
+                onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+                onToggleSelect={toggleSelect}
+                onStartEdit={setEditingId}
+                onCancelEdit={() => setEditingId(null)}
+                onSaveEdit={async (id, patch) => {
+                  await updateLoop(id, patch);
+                  setEditingId(null);
+                }}
+                onClearTimeblock={(id) => setLoopTimeblocks(id, [])}
+                onOpenDetail={(id) => setDetailId(id)}
+                onCreate={createLoop}
+                onKill={killLoop}
+                onQuickSchedule={addToNextOpenSlot}
+              />
+            ) : mode === 'research' ? (
+              <ResearchShelf
+                docs={researchDocs}
+                onSwitchToDesign={() => setMode('design')}
+                onArtifactViaChat={(doc) => {
+                  setClaudeChatOpen(true);
+                  setTimeout(() => {
+                    window.dispatchEvent(
+                      new CustomEvent('claude-chat:send', {
+                        detail: {
+                          prompt: `/artifact ${doc.filePath}`,
+                        },
+                      }),
+                    );
+                  }, 200);
+                }}
+                onFocusViaChat={(doc) => {
+                  setClaudeChatOpen(true);
+                  setTimeout(() => {
+                    window.dispatchEvent(
+                      new CustomEvent('claude-chat:send', {
+                        detail: {
+                          prompt: `/focus ${doc.title}`,
+                        },
+                      }),
+                    );
+                  }, 200);
+                }}
+              />
+            ) : mode === 'design' ? (
+              <DesignBench
+                specs={specDocs}
+                onRefetch={refetchSpecs}
+                onUpdateSpecStatus={(specId, newStatus) => {
+                  setSpecDocs((prev) =>
+                    prev.map((s) => (s.id === specId ? { ...s, status: newStatus as any } : s)),
+                  );
+                  specWriteInFlightRef.current += 1;
+                }}
+                onWriteComplete={() => {
+                  specWriteInFlightRef.current = Math.max(0, specWriteInFlightRef.current - 1);
+                }}
+                onDecomposeViaChat={(spec) => {
+                  setClaudeChatOpen(true);
+                  setTimeout(() => {
+                    window.dispatchEvent(
+                      new CustomEvent('claude-chat:send', {
+                        detail: {
+                          prompt: `/decompose ${spec.filePath}`,
+                        },
+                      }),
+                    );
+                  }, 200);
+                }}
+                onSpecViaChat={(spec) => {
+                  setClaudeChatOpen(true);
+                  setTimeout(() => {
+                    window.dispatchEvent(
+                      new CustomEvent('claude-chat:send', {
+                        detail: {
+                          prompt: `/spec ${spec.filePath}`,
+                        },
+                      }),
+                    );
+                  }, 200);
+                }}
+                onHandoffViaChat={(spec) => {
+                  setClaudeChatOpen(true);
+                  setTimeout(() => {
+                    window.dispatchEvent(
+                      new CustomEvent('claude-chat:send', {
+                        detail: {
+                          prompt: `/handoff ${spec.filePath}`,
+                        },
+                      }),
+                    );
+                  }, 200);
+                }}
+                onPlanViaChat={(spec) => {
+                  setClaudeChatOpen(true);
+                  setTimeout(() => {
+                    window.dispatchEvent(
+                      new CustomEvent('claude-chat:send', {
+                        detail: {
+                          prompt: `/plan ${spec.title}`,
+                        },
+                      }),
+                    );
+                  }, 200);
+                }}
+                onFocusSpec={async (spec) => {
+                  if (!data) { setMode('focus'); return; }
+                  const specName = spec.filePath.replace(/\.md$/, '');
+                  const linked = data.loops.find(
+                    (l) =>
+                      !l.done &&
+                      ((l.source?.file?.includes(spec.filePath) ?? false) ||
+                       (l.text?.includes(specName) ?? false)),
+                  );
+                  if (linked) {
+                    addToNextOpenSlot(linked.id);
+                    setFocusInitialPickId(linked.id);
+                  } else {
+                    // Create an ad-hoc loop from the spec title and schedule it
+                    const title = spec.title.replace(/\s*—\s*Agent Spec$/, '');
+                    await commitCreate({
+                      text: title,
+                      tier: 'now',
+                      pLevel: null,
+                      difficulty: null,
+                      subGroup: null,
+                      domain: 'project',
+                      status: 'active',
+                      timeEstimateMinutes: 60,
+                      timeblocks: [],
+                      notes: [],
+                      source: { file: spec.filePath, line: 0 },
+                    } as Omit<Loop, 'id'>);
+                    await refetch();
+                    // The picker will auto-find the new loop
+                  }
+                  setMode('focus');
+                }}
+              />
+            ) : (
+              <DesignBoard
+                onFix={(imgPath, annotations, captions) => {
+                  const annList = annotations
+                    .filter((a) => a.comment)
+                    .map((a) => `${a.index}. ${a.comment}`)
+                    .join('\n');
+                  const capList = (captions || [])
+                    .map((c, i) => `${i + 1}. ${c}`)
+                    .join('\n');
+                  const prompt = `/annotation-intake ${imgPath}\n\n${capList ? `Captions:\n${capList}\n\n` : ''}Annotations:\n${annList || '(no comments — review the image)'}`;
+                  setClaudeChatOpen(true);
+                  setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('claude-chat:send', { detail: { prompt } }));
+                  }, 300);
+                }}
+              />
+            )}
+          </PlanHub>
         ) : mode === 'reflect' ? (
           <ReflectionView
             loops={activeLoops}
@@ -1136,6 +1385,7 @@ export default function Page() {
             onRefetch={refetch}
             onOpenDetail={(id) => setDetailId(id)}
             onUpdateLoop={updateLoop}
+            onSwitchToBacklog={() => setMode('backlog')}
           />
         ) : mode === 'someday' ? (
           <SomedayView
@@ -1196,6 +1446,7 @@ export default function Page() {
               setDetailId(null);
             }}
             onOpenDetail={(id) => setDetailId(id)}
+            onSwitchToDesign={() => { setDetailId(null); setMode('design'); }}
             onCreateFollowThrough={async ({ title, dueDate, sourceLoop, artifact }) => {
               const nowIso = new Date().toISOString();
               const noteId = Math.random().toString(36).slice(2, 10);
@@ -1329,6 +1580,65 @@ export default function Page() {
             await saveData(next);
           }}
         />
+
+        <ClaudeChat
+          open={claudeChatOpen}
+          onClose={() => setClaudeChatOpen(false)}
+          loops={activeLoops}
+          allLoops={data.loops}
+          focusedLoop={
+            focusedId ? data.loops.find((l) => l.id === focusedId) ?? null : null
+          }
+          specs={specDocs}
+          pageContext={(() => {
+            const parts: string[] = [`Mode: ${mode}`];
+            if (mode === 'focus') {
+              const fl = focusedId ? data.loops.find((l) => l.id === focusedId) : null;
+              if (fl) parts.push(`Focused on: "${fl.text}" (${fl.source.file}), status: ${fl.status}, priority: ${fl.priority ?? fl.pLevel ?? 'none'}`);
+              parts.push(`Active loops: ${activeLoops.length}`);
+            } else if (mode === 'triage') {
+              const triageLoops = data.loops.filter((l) => !l.done && l.status === 'triage');
+              parts.push(`Triage queue: ${triageLoops.length} items`);
+              triageLoops.slice(0, 10).forEach((l) => parts.push(`  - "${l.text}" (${l.source.file})`));
+            } else if (mode === 'backlog') {
+              parts.push(`Backlog: ${activeLoops.length} active loops`);
+              const byGroup = new Map<string, number>();
+              activeLoops.forEach((l) => { const g = l.subGroup || 'ungrouped'; byGroup.set(g, (byGroup.get(g) || 0) + 1); });
+              byGroup.forEach((count, group) => parts.push(`  - ${group}: ${count}`));
+            } else if (mode === 'research' || mode === 'design') {
+              if (mode === 'research') {
+                parts.push(`Research shelf: ${researchDocs.length} docs`);
+                researchDocs.slice(0, 8).forEach((d) => parts.push(`  - "${d.title}" (${d.filePath}, ${d.staleDays}d old)`));
+              } else {
+                parts.push(`Design bench: ${specDocs.length} specs`);
+                specDocs.forEach((s) => parts.push(`  - "${s.title}" [${s.status}] ${s.linkedLoopCount} loops (${s.filePath})`));
+              }
+            } else if (mode === 'plan') {
+              parts.push(`Plan mode — week canvas with ${activeLoops.filter((l) => l.timeblocks.length > 0).length} scheduled loops`);
+            } else if (mode === 'reflect') {
+              const done = data.loops.filter((l) => l.done).length;
+              const stale = activeLoops.filter((l) => { if (!l.updatedAt) return false; return Date.now() - new Date(l.updatedAt).getTime() > 7 * 86400000; }).length;
+              parts.push(`Reflect: ${activeLoops.length} active, ${done} done, ${stale} stale`);
+            }
+            if (detailId) {
+              const dl = data.loops.find((l) => l.id === detailId);
+              if (dl) parts.push(`Detail drawer open for: "${dl.text}" (${dl.source.file})`);
+            }
+            return parts.join('\n');
+          })()}
+        />
+
+        {/* Claude chat trigger */}
+        {!claudeChatOpen && (
+          <button
+            type="button"
+            onClick={() => setClaudeChatOpen(true)}
+            className="fixed bottom-5 right-5 z-40 w-10 h-10 rounded-full bg-[var(--mauve)] text-white shadow-lg hover:opacity-90 transition-opacity flex items-center justify-center"
+            title="Claude Chat (⌘⇧C)"
+          >
+            <span className="text-[14px] font-medium">C</span>
+          </button>
+        )}
 
         {/* Drag overlay sized to task duration so what you see is what you get */}
         <DragOverlay dropAnimation={null}>
