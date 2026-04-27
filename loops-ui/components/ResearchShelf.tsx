@@ -773,8 +773,11 @@ function ResearchReader({
           />
         </div>
       ) : isHtml && content ? (
+        // Use a real URL (src=) instead of srcDoc so anchor links,
+        // JS-driven tab navigation, and relative paths inside the
+        // artifact work properly. about:srcdoc breaks all of those.
         <iframe
-          srcDoc={content}
+          src={`/api/vault/read?file=${encodeURIComponent(filePath)}&serve=html`}
           className="flex-1 min-h-0 w-full border-none"
           sandbox="allow-scripts allow-same-origin"
           title={title}

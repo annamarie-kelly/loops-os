@@ -63,6 +63,26 @@ export async function GET(request: Request) {
     return NextResponse.json({ file, content: '', available: false });
   }
 
+  // `?serve=html` returns the file directly with text/html so it can
+  // be embedded via <iframe src=...>. Anchor navigation, JS-driven
+  // tab switching, and relative links all work in a real-URL iframe;
+  // they're flaky in srcDoc / about:srcdoc. Only HTML files for now.
+  const serve = url.searchParams.get('serve');
+  if (serve === 'html' && actualRel.endsWith('.html')) {
+    try {
+      const buf = await fs.readFile(actualPath);
+      return new Response(new Uint8Array(buf), {
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          // Permissive cache for in-app iframe; revalidates on reload.
+          'Cache-Control': 'no-cache',
+        },
+      });
+    } catch {
+      return new Response('not found', { status: 404 });
+    }
+  }
+
   try {
     const content = await fs.readFile(actualPath, 'utf-8');
     const isHtml = actualRel.endsWith('.html');
