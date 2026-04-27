@@ -76,6 +76,26 @@
           "path": { "type": "string", "description": "Absolute path to the repo on disk." }
         }
       }
+    },
+    "researchFolders": {
+      "type": "array",
+      "description": "Vault folders the Research shelf scans. When omitted, the app falls back to the public-template defaults. Override when your vault uses a different layout (e.g. artifacts under assets/, reports under 01-Building/).",
+      "items": {
+        "type": "object",
+        "required": ["folder", "category", "recursive"],
+        "properties": {
+          "folder": { "type": "string", "description": "Vault-relative folder to scan." },
+          "category": {
+            "enum": ["strategic-research", "technical-investigation", "design-research", "foundational", "artifact"]
+          },
+          "recursive": { "type": "boolean" },
+          "extensions": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "File extensions to include. Defaults to ['.md']; use ['.html'] for artifacts."
+          }
+        }
+      }
     }
   }
 }

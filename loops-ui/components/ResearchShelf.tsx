@@ -520,10 +520,12 @@ function ResearchCard({
         </span>
       </div>
 
-      {/* Summary */}
-      <p className="text-[11px] text-ink-soft leading-relaxed line-clamp-3 mb-2">
-        {doc.summary}
-      </p>
+      {/* Summary — render inline markdown (bold, code, links) so cards
+          don't show literal `**foo**` syntax. */}
+      <p
+        className="text-[11px] text-ink-soft leading-relaxed line-clamp-3 mb-2"
+        dangerouslySetInnerHTML={{ __html: inlineFormat(doc.summary) }}
+      />
 
       {/* Metadata row */}
       <div className="flex items-center gap-2 text-[10px] text-ink-ghost">

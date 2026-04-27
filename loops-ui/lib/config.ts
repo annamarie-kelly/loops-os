@@ -23,6 +23,20 @@ export interface RepoConfig {
   path: string;
 }
 
+export type ResearchCategory =
+  | 'strategic-research'
+  | 'technical-investigation'
+  | 'design-research'
+  | 'foundational'
+  | 'artifact';
+
+export interface ResearchFolderConfig {
+  folder: string;
+  category: ResearchCategory;
+  recursive: boolean;
+  extensions?: string[];
+}
+
 export interface LoopsConfig {
   vault: {
     scanFolders: string[];
@@ -39,6 +53,11 @@ export interface LoopsConfig {
   // picker so a chat session can run `claude -p` against the right
   // tree (instead of always defaulting to the vault).
   repos?: RepoConfig[];
+  // Vault folders the Research shelf scans. When omitted, falls
+  // back to the public-template defaults (01-Creating/artifacts,
+  // 02-Thinking/reports, ...). Override per-user when the vault
+  // layout differs.
+  researchFolders?: ResearchFolderConfig[];
 }
 
 export const config: LoopsConfig = raw as LoopsConfig;

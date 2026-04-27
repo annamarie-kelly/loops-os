@@ -5,23 +5,33 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 
 import type { ResearchCategory, ResearchDoc } from '@/lib/types';
+import { config } from '@/lib/config';
 
 const VAULT_ROOT = process.env.LOOPS_UI_VAULT_ROOT
   ? path.resolve(process.env.LOOPS_UI_VAULT_ROOT)
   : path.resolve(process.cwd(), '../vault-template');
 
 // Folder → category mapping
-const FOLDER_CATEGORIES: Array<{
+// Default scan list when loops.config.json doesn't override. recursive:
+// true so docs nested under per-project subfolders are picked up; the
+// shallower 02-Thinking entry comes last so deeper, more specific
+// categories claim a doc first.
+const DEFAULT_FOLDER_CATEGORIES: Array<{
   folder: string;
   category: ResearchCategory;
   recursive: boolean;
   extensions?: string[];
 }> = [
-  { folder: '01-Creating/artifacts', category: 'artifact', recursive: false, extensions: ['.html'] },
-  { folder: '02-Thinking/reports', category: 'strategic-research', recursive: false },
-  { folder: '02-Thinking/Agent Investigations', category: 'technical-investigation', recursive: false },
-  { folder: '02-Thinking', category: 'foundational', recursive: false },
+  { folder: '01-Creating/artifacts', category: 'artifact', recursive: true, extensions: ['.html'] },
+  { folder: '02-Thinking/reports', category: 'strategic-research', recursive: true },
+  { folder: '02-Thinking/Agent Investigations', category: 'technical-investigation', recursive: true },
+  { folder: '02-Thinking', category: 'foundational', recursive: true },
 ];
+
+const FOLDER_CATEGORIES =
+  (config.researchFolders && config.researchFolders.length > 0
+    ? config.researchFolders
+    : DEFAULT_FOLDER_CATEGORIES) as typeof DEFAULT_FOLDER_CATEGORIES;
 
 // Inbox patterns that count as strategic research
 const INBOX_PATTERNS = ['Deep Research'];
@@ -113,6 +123,14 @@ async function scanFolder(
 
   for (const entry of entries) {
     const name = String(entry.name);
+    if (entry.isDirectory()) {
+      // Skip dotfolders + Obsidian/git internals; recurse into the rest.
+      if (!recursive) continue;
+      if (name.startsWith('.') || name === 'node_modules') continue;
+      const nested = await scanFolder(path.join(folderAbs, name), defaultCategory, true, extensions);
+      docs.push(...nested);
+      continue;
+    }
     const ext = path.extname(name);
     if (!entry.isFile() || !extensions.includes(ext)) continue;
     // Skip index/pattern files
