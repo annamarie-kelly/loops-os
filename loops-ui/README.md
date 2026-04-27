@@ -22,6 +22,22 @@ Four keyboard moves cover the bulk of the day:
 
 Plus the obvious ones inside each mode: `j`/`k` to move between loops in Focus, `1`/`2`/`3` for triage decisions, `[`/`]` to collapse the Plan sidebar, `Esc` to back out of anything.
 
+## Mental model
+
+A loop moves through four states. The four modes are the surfaces for each.
+
+```
+capture → Triage (decide) → Backlog (commit) → Plan (schedule) → Focus (do)
+              ↘ Someday (defer) / Done (drop)
+```
+
+- **Triage** answers *"what just landed and needs a decision?"* — only items with `status: 'triage'`. One card at a time; `1`/`2`/`3` move them out fast. Empty Triage is the goal state.
+- **Backlog** answers *"what am I committed to but not working on right now?"* — your active working set. Loops only land here after you accept them in Triage (or mark them P0 to bypass).
+- **Plan** is where Backlog items get pushed onto a calendar. Drag to schedule.
+- **Focus** is *right now*: the active timeblock or the next one starting today.
+
+Triage is the **gate**. Backlog is the **garden**. Focus is **right now**. Nothing skips ahead without a decision — that's the whole point.
+
 ## Getting started
 
 You need Node 20+ and a folder you'd like to use as a vault. If you don't have one, the repo ships with `../vault-template/` and the dev server points at it by default.

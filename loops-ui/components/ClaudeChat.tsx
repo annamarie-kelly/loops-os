@@ -448,11 +448,13 @@ export function ClaudeChat({
 
   return (
     <div className="fixed inset-y-0 right-0 w-[440px] z-50 flex flex-col border-l border-edge shadow-lg" style={{ backgroundColor: 'var(--surface-page)' }}>
-      {/* Header */}
-      <div className="px-4 py-3 flex items-center gap-3 border-b border-edge shrink-0">
+      {/* Header — explicit h-[47px] matches the main Header
+           (py-2.5 + 26px logo + 1px border) so the bottom borders
+           line up exactly where the panel meets the main view. */}
+      <div className="px-5 h-[47px] flex items-center gap-3 border-b border-edge shrink-0">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="w-5 h-5 rounded-full bg-mauve-fill flex items-center justify-center">
-            <span className="text-[10px] text-[var(--mauve)]">C</span>
+          <div className="w-[26px] h-[26px] rounded-md bg-mauve-fill flex items-center justify-center shrink-0">
+            <span className="text-[11px] text-[var(--mauve)] font-medium">C</span>
           </div>
           {sessionId && !streaming && (
             <span className="text-[9px] text-sage-text bg-sage-fill px-1.5 py-0.5 rounded-full">

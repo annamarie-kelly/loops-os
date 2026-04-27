@@ -130,7 +130,7 @@ export function FirstLaunchRitual({
             </button>
             {lines.length > 0 && (
               <span className="text-[11px] text-ink-ghost tabular-nums ml-auto">
-                {lines.length} {lines.length === 1 ? 'line' : 'lines'}
+                {lines.length} &rarr; Triage
               </span>
             )}
           </div>
