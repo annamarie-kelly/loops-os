@@ -6,6 +6,13 @@ const VAULT_ROOT = process.env.LOOPS_UI_VAULT_ROOT
   ? path.resolve(process.env.LOOPS_UI_VAULT_ROOT)
   : path.resolve(process.cwd(), '../vault-template');
 
+// Containment check: a bare prefix match lets a sibling directory
+// "../vault2/x" sneak past `startsWith(VAULT_ROOT)`. Require either an
+// exact match or a path-separator boundary.
+function containsInVault(abs: string): boolean {
+  return abs === VAULT_ROOT || abs.startsWith(VAULT_ROOT + path.sep);
+}
+
 export async function PUT(request: Request) {
   const body = (await request.json()) as {
     file: string;
@@ -20,7 +27,7 @@ export async function PUT(request: Request) {
   }
 
   const abs = path.resolve(path.join(VAULT_ROOT, file));
-  if (!abs.startsWith(VAULT_ROOT)) {
+  if (!containsInVault(abs)) {
     return NextResponse.json({ error: 'invalid path' }, { status: 400 });
   }
 
@@ -65,7 +72,7 @@ export async function DELETE(request: Request) {
   }
 
   const abs = path.resolve(path.join(VAULT_ROOT, file));
-  if (!abs.startsWith(VAULT_ROOT)) {
+  if (!containsInVault(abs)) {
     return NextResponse.json({ error: 'invalid path' }, { status: 400 });
   }
 

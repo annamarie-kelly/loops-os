@@ -15,6 +15,13 @@ const ALLOWED_ROOTS = [
   ...codebaseDocs.map((d: { dir: string }) => path.resolve(d.dir)),
 ];
 
+// Containment requires an exact match or a path-separator boundary —
+// a bare `startsWith` would let a sibling dir like "../vault2/x"
+// sneak past when VAULT_ROOT happens to share a prefix.
+function isContained(abs: string, root: string): boolean {
+  return abs === root || abs.startsWith(root + path.sep);
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const file = url.searchParams.get('file');
@@ -25,18 +32,72 @@ export async function GET(request: Request) {
 
   // Support both vault-relative and absolute paths
   const resolved = path.isAbsolute(file) ? path.resolve(file) : path.resolve(VAULT_ROOT, file);
-  if (!ALLOWED_ROOTS.some((root) => resolved.startsWith(root))) {
+  if (!ALLOWED_ROOTS.some((root) => isContained(resolved, root))) {
     return NextResponse.json({ error: 'invalid path' }, { status: 400 });
   }
 
+  let actualPath = resolved;
+  let actualRel = file;
+  let exists = true;
   try {
-    const content = await fs.readFile(resolved, 'utf-8');
-    const isHtml = file.endsWith('.html');
-    const raw = url.searchParams.get('raw') === '1';
-    // Strip YAML frontmatter for markdown display; serve HTML and raw requests as-is
-    const body = (isHtml || raw) ? content : content.replace(/^---[\s\S]*?---\n*/, '');
-    return NextResponse.json({ file, content: body, available: true, isHtml });
+    await fs.access(resolved);
   } catch {
+    exists = false;
+  }
+
+  // Wikilink fallback: if the literal path doesn't exist AND the
+  // request looks like a basename (no slash), scan the vault for any
+  // file whose basename matches. Lets `[[Note]]` resolve regardless
+  // of which folder it lives in.
+  if (!exists && !file.includes('/') && !path.isAbsolute(file)) {
+    const target = file.endsWith('.md') ? file : `${file}.md`;
+    const found = await findByBasename(VAULT_ROOT, target);
+    if (found) {
+      actualPath = found.abs;
+      actualRel = found.rel;
+      exists = true;
+    }
+  }
+
+  if (!exists) {
     return NextResponse.json({ file, content: '', available: false });
   }
+
+  try {
+    const content = await fs.readFile(actualPath, 'utf-8');
+    const isHtml = actualRel.endsWith('.html');
+    const raw = url.searchParams.get('raw') === '1';
+    const body = (isHtml || raw) ? content : content.replace(/^---[\s\S]*?---\n*/, '');
+    return NextResponse.json({ file: actualRel, content: body, available: true, isHtml });
+  } catch {
+    return NextResponse.json({ file: actualRel, content: '', available: false });
+  }
+}
+
+async function findByBasename(
+  root: string,
+  basename: string,
+): Promise<{ abs: string; rel: string } | null> {
+  const HIDDEN = new Set(['.obsidian', '.git', '.claude', 'node_modules', '06-Loops']);
+  async function walk(dir: string, rel: string): Promise<{ abs: string; rel: string } | null> {
+    let entries: import('node:fs').Dirent[];
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return null;
+    }
+    for (const entry of entries) {
+      if (HIDDEN.has(entry.name) || entry.name.startsWith('.')) continue;
+      const abs = path.join(dir, entry.name);
+      const next = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        const hit = await walk(abs, next);
+        if (hit) return hit;
+      } else if (entry.isFile() && entry.name === basename) {
+        return { abs, rel: next };
+      }
+    }
+    return null;
+  }
+  return walk(root, '');
 }

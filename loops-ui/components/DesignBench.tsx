@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/core';
 import type { SpecDoc, SpecStatus } from '@/lib/types';
 import { renderMarkdown, escapeHtml, inlineFormat } from '@/lib/renderMarkdown';
+import { MarkdownEditor } from '@/components/MarkdownEditor';
 
 const COLUMNS: { status: SpecStatus; label: string; emptyHint: string }[] = [
   { status: 'drafting', label: 'Drafting', emptyHint: 'Promote research docs to start specs here' },
@@ -436,7 +437,6 @@ function SpecReader({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     setFilePath(spec.filePath);
@@ -472,14 +472,18 @@ function SpecReader({
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (editing) { setEditing(false); setDirty(false); }
-        else onClose();
+      if (e.key !== 'Escape') return;
+      if (editing) {
+        if (dirty && !window.confirm('Discard unsaved changes?')) return;
+        setEditing(false);
+        setDirty(false);
+      } else {
+        onClose();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose, editing]);
+  }, [onClose, editing, dirty]);
 
   const handleContentClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -506,16 +510,17 @@ function SpecReader({
     setEditBuffer(content || '');
     setEditing(true);
     setDirty(false);
-    setTimeout(() => textareaRef.current?.focus(), 50);
   }, [content]);
 
   const saveEdit = useCallback(async () => {
     setSaving(true);
     try {
+      // raw: false → API preserves existing frontmatter (read endpoint
+      // strips it, so editBuffer never contains it).
       await fetch('/api/vault/write', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file: filePath, content: editBuffer, raw: true }),
+        body: JSON.stringify({ file: filePath, content: editBuffer }),
       });
       setContent(editBuffer);
       setEditing(false);
@@ -603,7 +608,15 @@ function SpecReader({
 
           <button
             type="button"
-            onClick={() => { if (editing) { setEditing(false); setDirty(false); } else onClose(); }}
+            onClick={() => {
+              if (editing) {
+                if (dirty && !window.confirm('Discard unsaved changes?')) return;
+                setEditing(false);
+                setDirty(false);
+              } else {
+                onClose();
+              }
+            }}
             className="text-ink-ghost hover:text-ink text-[14px] px-1.5 py-0.5 rounded hover:bg-inset transition-colors"
           >
             &#x2715;
@@ -628,18 +641,12 @@ function SpecReader({
           {loading ? (
             <div className="text-[11px] text-ink-ghost animate-pulse pt-4">Loading...</div>
           ) : editing ? (
-            <textarea
-              ref={textareaRef}
+            <MarkdownEditor
               value={editBuffer}
-              onChange={(e) => { setEditBuffer(e.target.value); setDirty(true); }}
-              onKeyDown={(e) => {
-                if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  if (dirty) saveEdit();
-                }
-              }}
-              className="w-full h-full text-[12px] text-ink font-mono leading-relaxed bg-transparent border-none outline-none resize-none"
-              spellCheck={false}
+              onChange={(next) => { setEditBuffer(next); setDirty(true); }}
+              onSave={() => { if (dirty) void saveEdit(); }}
+              autoFocus
+              className="w-full h-full"
             />
           ) : content ? (
             <div dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }} />

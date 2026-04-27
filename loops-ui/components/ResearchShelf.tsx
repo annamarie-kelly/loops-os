@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ResearchCategory, ResearchDoc } from '@/lib/types';
 import { renderMarkdown, escapeHtml, inlineFormat } from '@/lib/renderMarkdown';
+import { MarkdownEditor, invalidateVaultFileCache } from '@/components/MarkdownEditor';
 
 const CATEGORY_META: Record<
   ResearchCategory,
@@ -400,16 +401,18 @@ export function ResearchShelf({
                 type="text"
                 value={newDocTitle}
                 onChange={(e) => setNewDocTitle(e.target.value)}
-                placeholder="Title (e.g. YC Application Research)"
+                placeholder="Title (e.g. Market Sizing Notes)"
                 className="w-full text-[12px] px-3 py-2 rounded-md border border-edge bg-surface text-ink placeholder:text-ink-ghost focus:outline-none focus:border-edge-hover"
                 autoFocus
               />
-              <textarea
-                value={newDocContent}
-                onChange={(e) => setNewDocContent(e.target.value)}
-                placeholder="Paste markdown content here..."
-                className="flex-1 min-h-[200px] w-full resize-none text-[11px] px-3 py-2 rounded-md border border-edge bg-surface text-ink font-mono leading-relaxed placeholder:text-ink-ghost focus:outline-none focus:border-edge-hover scrollbar-subtle"
-              />
+              <div className="flex-1 min-h-[200px] w-full rounded-md border border-edge bg-surface focus-within:border-edge-hover overflow-hidden">
+                <MarkdownEditor
+                  value={newDocContent}
+                  onChange={setNewDocContent}
+                  placeholder="Paste or type markdown here..."
+                  className="h-full overflow-auto scrollbar-subtle"
+                />
+              </div>
             </div>
             <div className="px-5 py-3 border-t border-edge flex items-center gap-2 justify-end">
               <button
@@ -438,6 +441,7 @@ export function ResearchShelf({
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ file: filePath, content: body }),
                     });
+                    invalidateVaultFileCache();
                     setShowNewDoc(false);
                     setNewDocTitle('');
                     setNewDocContent('');
@@ -598,7 +602,6 @@ function ResearchReader({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Reset when doc changes externally
   useEffect(() => {
@@ -635,32 +638,40 @@ function ResearchReader({
       });
   }, [filePath, doc.filePath]);
 
-  // Esc to close (or exit edit mode)
+  // Esc to close (or exit edit mode). If the user has unsaved
+  // changes, confirm before discarding — fat-fingering Esc when you
+  // meant ⌘S shouldn't blow away work.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (editing) { setEditing(false); setDirty(false); }
-        else onClose();
+      if (e.key !== 'Escape') return;
+      if (editing) {
+        if (dirty && !window.confirm('Discard unsaved changes?')) return;
+        setEditing(false);
+        setDirty(false);
+      } else {
+        onClose();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose, editing]);
+  }, [onClose, editing, dirty]);
 
   const startEditing = useCallback(() => {
     setEditBuffer(content || '');
     setEditing(true);
     setDirty(false);
-    setTimeout(() => textareaRef.current?.focus(), 50);
   }, [content]);
 
   const saveEdit = useCallback(async () => {
     setSaving(true);
     try {
+      // raw: false → API preserves the existing file's frontmatter
+      // and prepends it to our buffer (which is frontmatter-stripped
+      // from the read endpoint).
       await fetch('/api/vault/write', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file: filePath, content: editBuffer, raw: true }),
+        body: JSON.stringify({ file: filePath, content: editBuffer }),
       });
       setContent(editBuffer);
       setEditing(false);
@@ -743,13 +754,13 @@ function ResearchReader({
 
       {/* Reader body */}
       {editing ? (
-        <div className="flex-1 min-h-0 flex flex-col">
-          <textarea
-            ref={textareaRef}
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <MarkdownEditor
             value={editBuffer}
-            onChange={(e) => { setEditBuffer(e.target.value); setDirty(true); }}
-            className="flex-1 min-h-0 w-full resize-none px-5 py-4 text-[12px] text-ink bg-transparent font-mono leading-relaxed focus:outline-none scrollbar-subtle"
-            spellCheck={false}
+            onChange={(next) => { setEditBuffer(next); setDirty(true); }}
+            onSave={() => { void saveEdit(); }}
+            autoFocus
+            className="flex-1 min-h-0 overflow-auto scrollbar-subtle"
           />
         </div>
       ) : isHtml && content ? (

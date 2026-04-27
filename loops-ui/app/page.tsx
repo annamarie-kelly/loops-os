@@ -57,6 +57,9 @@ import { DesignBoard } from '@/components/DesignBoard';
 import { PlanHub } from '@/components/PlanHub';
 import { TriageMigrationModal } from '@/components/TriageMigrationModal';
 import { ClaudeChat } from '@/components/ClaudeChat';
+import { VaultBrowser } from '@/components/VaultBrowser';
+import { NoteReader } from '@/components/NoteReader';
+import { CaptureBar } from '@/components/CaptureBar';
 import { appendBoundaryLog } from '@/lib/tend';
 import {
   checkCapacityGate,
@@ -91,6 +94,12 @@ export default function Page() {
   const [boundaryPanelOpen, setBoundaryPanelOpen] = useState(false);
   const [adoptOpen, setAdoptOpen] = useState(false);
   const [claudeChatOpen, setClaudeChatOpen] = useState(false);
+  // ─── Vault browser (replaces Obsidian's left sidebar) ───────────
+  const [vaultBrowserOpen, setVaultBrowserOpen] = useState(false);
+  const [openNotePath, setOpenNotePath] = useState<string | null>(null);
+  // Bumping this number after a save/create makes VaultBrowser refetch.
+  const [vaultRefreshKey, setVaultRefreshKey] = useState(0);
+  const [captureOpen, setCaptureOpen] = useState(false);
   const [capacityGate, setCapacityGate] = useState<{
     open: boolean;
     kind: 'P1:stakeholder' | 'P1:self' | 'P1-cap' | 'P2-cap';
@@ -916,6 +925,20 @@ export default function Page() {
         setClaudeChatOpen((v) => !v);
         return;
       }
+      // ⌘\ toggles the vault browser.
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
+        e.preventDefault();
+        setVaultBrowserOpen((v) => !v);
+        return;
+      }
+      // `c` (no modifiers) opens the capture bar — the "always on"
+      // way to drop a thought into the triage inbox without leaving
+      // the current view.
+      if (!inEditable && !e.metaKey && !e.ctrlKey && !e.altKey && (e.key === 'c' || e.key === 'C')) {
+        e.preventDefault();
+        setCaptureOpen(true);
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault();
         setSearchOpen((v) => !v);
@@ -1123,6 +1146,7 @@ export default function Page() {
           onClearSelection={clearSelection}
           onOpenSearch={() => setSearchOpen(true)}
           onOpenBoundaryLog={() => setBoundaryPanelOpen(true)}
+          onOpenVaultBrowser={() => setVaultBrowserOpen(true)}
           sortBy={sortBy}
           onSetSortBy={setSortBy}
           filterPBuckets={filterPBuckets}
@@ -1646,6 +1670,38 @@ export default function Page() {
             <DragPill loop={draggingLoop} extraCount={selectedIds.size - 1} />
           ) : null}
         </DragOverlay>
+
+        {/* Vault browser — slide-in left drawer (Obsidian replacement). */}
+        <VaultBrowser
+          open={vaultBrowserOpen}
+          onClose={() => setVaultBrowserOpen(false)}
+          onSelect={(p) => {
+            setOpenNotePath(p);
+            setVaultBrowserOpen(false);
+          }}
+          activeFilePath={openNotePath}
+          refreshKey={vaultRefreshKey}
+        />
+
+        {/* Note reader — fullscreen overlay for any vault file.
+            Always opens in edit mode; click "Preview" for the
+            rendered view. */}
+        {openNotePath && (
+          <NoteReader
+            key={openNotePath}
+            filePath={openNotePath}
+            onClose={() => setOpenNotePath(null)}
+            onSaved={() => setVaultRefreshKey((k) => k + 1)}
+            onNavigate={(next) => setOpenNotePath(next)}
+          />
+        )}
+
+        {/* Capture bar — `c` from anywhere; lands in triage. */}
+        <CaptureBar
+          open={captureOpen}
+          onClose={() => setCaptureOpen(false)}
+          onCapture={createLoop}
+        />
       </div>
     </DndContext>
   );

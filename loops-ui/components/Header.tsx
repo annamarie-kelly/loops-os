@@ -20,6 +20,7 @@ export function Header({
   onClearSelection,
   onOpenSearch,
   onOpenBoundaryLog,
+  onOpenVaultBrowser,
   sortBy,
   onSetSortBy,
   filterPBuckets,
@@ -40,6 +41,7 @@ export function Header({
   onClearSelection: () => void;
   onOpenSearch?: () => void;
   onOpenBoundaryLog?: () => void;
+  onOpenVaultBrowser?: () => void;
   sortBy: SortBy;
   onSetSortBy: (s: SortBy) => void;
   filterPBuckets: Set<string>;
@@ -77,13 +79,30 @@ export function Header({
       <div className="px-5 py-2.5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-5 min-w-0">
           <h1 className="shrink-0" aria-label="Tend">
-            <img
-              src="/icon_v5_cream_on_mauve.png"
-              alt=""
-              width={26}
-              height={26}
-              className="rounded-md"
-            />
+            {onOpenVaultBrowser ? (
+              <button
+                type="button"
+                onClick={onOpenVaultBrowser}
+                className="rounded-md hover:opacity-80 transition-opacity"
+                title="Open vault (⌘\\)"
+              >
+                <img
+                  src="/icon_v5_cream_on_mauve.png"
+                  alt=""
+                  width={26}
+                  height={26}
+                  className="rounded-md"
+                />
+              </button>
+            ) : (
+              <img
+                src="/icon_v5_cream_on_mauve.png"
+                alt=""
+                width={26}
+                height={26}
+                className="rounded-md"
+              />
+            )}
           </h1>
 
           {/* Primary segmented nav — just the four "what are you

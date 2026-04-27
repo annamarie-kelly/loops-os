@@ -13,9 +13,16 @@
     "notes-index:dry": "node --env-file=.env.local scripts/notes-index.mjs --dry"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "^6.20.1",
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.41.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@lezer/highlight": "^1.2.3",
     "next": "16.2.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
