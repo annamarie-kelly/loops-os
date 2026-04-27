@@ -61,7 +61,7 @@ import { VaultBrowser } from '@/components/VaultBrowser';
 import { NoteReader } from '@/components/NoteReader';
 import { CaptureBar } from '@/components/CaptureBar';
 import { FirstLaunchRitual } from '@/components/FirstLaunchRitual';
-import { loadDemoSeed } from '@/lib/demo-seed';
+import { loadDemoSeed, clearDemoSeed, isDemoLoop } from '@/lib/demo-seed';
 import { appendBoundaryLog } from '@/lib/tend';
 import {
   checkCapacityGate,
@@ -1187,6 +1187,18 @@ export default function Page() {
               ? data.loops.filter((l) => !l.done && l.status === 'triage').length
               : 0
           }
+          demoCount={(() => {
+            if (!data) return 0;
+            const live = data.loops.filter((l) => !l.done);
+            const demos = live.filter(isDemoLoop).length;
+            const real = live.length - demos;
+            // Only surface the pill once a real loop exists — until
+            // then, demo loops ARE the user's whole experience.
+            return real > 0 ? demos : 0;
+          })()}
+          onClearDemo={() => {
+            if (data) void clearDemoSeed(updateLoop, data.loops);
+          }}
         />
 
         {mode === 'focus' ? (

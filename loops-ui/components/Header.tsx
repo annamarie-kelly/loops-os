@@ -30,6 +30,8 @@ export function Header({
   onToggleStakeholder,
   onClearStakeholders,
   triageBadgeCount = 0,
+  demoCount = 0,
+  onClearDemo,
 }: {
   mode: Mode;
   onSetMode: (m: Mode) => void;
@@ -51,6 +53,10 @@ export function Header({
   onToggleStakeholder: (s: string) => void;
   onClearStakeholders: () => void;
   triageBadgeCount?: number;
+  // Number of live demo loops; the pill only renders when > 0 AND a
+  // real (non-demo) loop also exists — see app/page.tsx for that gate.
+  demoCount?: number;
+  onClearDemo?: () => void;
 }) {
   const pct = Math.round((committedMinutes / availableMinutes) * 100);
   const [theme, setTheme] = useState<Theme>('system');
@@ -169,6 +175,18 @@ export function Header({
         </div>
 
         <div className="flex items-center gap-2">
+          {demoCount > 0 && onClearDemo && (
+            <button
+              type="button"
+              onClick={onClearDemo}
+              className="flex items-center gap-1.5 text-[11px] text-ink-faint hover:text-ink-soft px-2 py-1 rounded-md border border-edge hover:border-edge-hover hover:bg-inset transition-colors"
+              title="Clear demo data — flips the seeded loops to done"
+            >
+              <span className="tabular-nums">{demoCount}</span>
+              <span>demo</span>
+              <span className="text-ink-ghost">×</span>
+            </button>
+          )}
           {selectedCount > 0 && (
             <button
               type="button"

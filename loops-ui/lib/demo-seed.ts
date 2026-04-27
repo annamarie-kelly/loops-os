@@ -103,7 +103,9 @@ export async function loadDemoSeed(
       timeblocks: [],
       done: false,
       updatedAt: now,
-      tendSource: 'manual',
+      // 'demo' marker lets the Header surface a "clear demo" pill
+      // once the user starts capturing their own loops.
+      tendSource: 'demo',
     };
     await createLoop(draft);
   }
@@ -124,5 +126,28 @@ export async function loadDemoSeed(
     localStorage.setItem(DEMO_FLAG, new Date().toISOString());
   } catch {
     // localStorage access can throw in some private modes; ignore.
+  }
+}
+
+// Marks every demo loop as done — same shape as a normal "drop"
+// disposition, so the rest of the system treats them as triaged-out
+// rather than sitting in the active set. Caller invalidates state.
+export function isDemoLoop(loop: { tendSource?: string }): boolean {
+  return loop.tendSource === 'demo';
+}
+
+export async function clearDemoSeed(
+  updateLoop: (id: string, patch: Partial<Loop>) => Promise<void> | void,
+  loops: Loop[],
+): Promise<void> {
+  const demos = loops.filter((l) => isDemoLoop(l) && !l.done);
+  for (const l of demos) {
+    // Same shape as a "drop" disposition — status:'dropped' + done.
+    await updateLoop(l.id, { status: 'dropped', done: true });
+  }
+  try {
+    localStorage.removeItem(DEMO_FLAG);
+  } catch {
+    // ignore
   }
 }

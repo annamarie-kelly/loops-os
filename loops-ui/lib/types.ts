@@ -78,7 +78,7 @@ export interface Loop {
   // How the loop entered the system. 'manual' = created via the
   // Adopt dialog. Existing loops without this field are treated as
   // scanned from the vault.
-  tendSource?: 'manual' | 'scanned' | 'linear';
+  tendSource?: 'manual' | 'scanned' | 'linear' | 'demo';
   // User-set pin that forces this loop into the derived Now tier
   // regardless of schedule or priority. The Plan-mode keyboard `w`
   // shortcut toggles it. Cleared automatically when the loop is
