@@ -385,6 +385,49 @@ export function DesignBoard({
     }));
   }, [updateBoard]);
 
+  // Drag the bottom-right corner of a card to resize. Width grows /
+  // shrinks; image stays w-full h-auto so the height follows. Screen
+  // pixels are divided by `zoom` so the handle tracks the cursor 1:1.
+  // We pull the start width off `board` inside the closure (instead of
+  // closing over destructured `cards`) so the order of declarations
+  // doesn't matter.
+  const startResize = useCallback(
+    (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const startX = e.clientX;
+      let startWidth: number | null = null;
+      // Resolve the current width lazily so we don't depend on the
+      // `cards` destructure further down in the component body.
+      setBoard((prev) => {
+        const c = prev.cards.find((x) => x.id === id);
+        if (c) startWidth = c.width;
+        return prev;
+      });
+      if (startWidth == null) return;
+      const initial = startWidth;
+      const onMove = (ev: MouseEvent) => {
+        const dx = (ev.clientX - startX) / zoom;
+        const next = Math.max(120, Math.min(2400, initial + dx));
+        updateBoard((prev) => ({
+          ...prev,
+          cards: prev.cards.map((c) =>
+            c.id === id ? { ...c, width: Math.round(next) } : c,
+          ),
+        }));
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.cursor = '';
+      };
+      document.body.style.cursor = 'nwse-resize';
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    },
+    [zoom, updateBoard],
+  );
+
   // ── Sequence bar: drag to reorder ──
   const handleSeqDragStart = useCallback((idx: number) => {
     setSeqDragging({ idx, overIdx: idx });
@@ -1117,6 +1160,18 @@ export function DesignBoard({
                       ×
                     </button>
                   </div>
+                  {/* Resize handle — bottom-right corner. Drag to scale. */}
+                  <div
+                    onMouseDown={(e) => startResize(e, card.id)}
+                    className="absolute bottom-1 right-1 w-3 h-3 cursor-nwse-resize opacity-30 hover:opacity-90 transition-opacity"
+                    title="Drag to resize"
+                    aria-label="Resize"
+                    style={{
+                      backgroundImage:
+                        'linear-gradient(135deg, transparent 0 60%, currentColor 60% 70%, transparent 70% 80%, currentColor 80% 90%, transparent 90%)',
+                      color: 'var(--text-ghost)',
+                    }}
+                  />
                 </div>
               </div>
             ))}
