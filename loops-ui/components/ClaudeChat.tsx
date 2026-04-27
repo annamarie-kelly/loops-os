@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Loop, SpecDoc } from '@/lib/types';
+import { config } from '@/lib/config';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -36,7 +37,7 @@ interface StreamEvent {
 async function streamClaude(
   prompt: string,
   onEvent: (event: StreamEvent) => void,
-  opts?: { sessionId?: string; isResume?: boolean; signal?: AbortSignal },
+  opts?: { sessionId?: string; isResume?: boolean; signal?: AbortSignal; cwd?: string },
 ): Promise<void> {
   const res = await fetch('/api/claude', {
     method: 'POST',
@@ -45,6 +46,7 @@ async function streamClaude(
       prompt,
       sessionId: opts?.sessionId,
       isResume: opts?.isResume,
+      cwd: opts?.cwd,
     }),
     signal: opts?.signal,
   });
@@ -213,6 +215,10 @@ export function ClaudeChat({
   const [streaming, setStreaming] = useState(false);
   const [showActions, setShowActions] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // Where to run `claude -p`. null = vault root (default). The picker
+  // below switches it to a configured repo for code-editing chats.
+  const [chatCwd, setChatCwd] = useState<string | null>(null);
+  const repos = config.repos ?? [];
   const messageCountRef = useRef(0); // tracks messages sent in this session
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -381,6 +387,7 @@ export function ClaudeChat({
             sessionId: currentSessionId,
             isResume: !isFirst,
             signal: controller.signal,
+            cwd: chatCwd ?? undefined,
           },
         );
       } catch (err) {
@@ -405,7 +412,7 @@ export function ClaudeChat({
         }
       }
     },
-    [streaming, sessionId],
+    [streaming, sessionId, chatCwd],
   );
 
   // Listen for programmatic send events (from action buttons elsewhere in the app)
@@ -456,6 +463,25 @@ export function ClaudeChat({
           <div className="w-[26px] h-[26px] rounded-md bg-mauve-fill flex items-center justify-center shrink-0">
             <span className="text-[11px] text-[var(--mauve)] font-medium">C</span>
           </div>
+          {/* Repo picker — vault by default; switches to a configured
+              repo so `claude -p` runs against the right tree. Only
+              renders when the user has configured at least one repo. */}
+          {repos.length > 0 && (
+            <select
+              value={chatCwd ?? ''}
+              onChange={(e) => setChatCwd(e.target.value || null)}
+              disabled={streaming}
+              className="text-[10px] text-ink-soft bg-transparent border border-edge rounded px-1.5 py-0.5 focus:outline-none focus:border-edge-hover hover:border-edge-hover disabled:opacity-50"
+              title="Working directory for `claude -p`"
+            >
+              <option value="">Vault</option>
+              {repos.map((r) => (
+                <option key={r.path} value={r.path}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          )}
           {sessionId && !streaming && (
             <span className="text-[9px] text-sage-text bg-sage-fill px-1.5 py-0.5 rounded-full">
               session

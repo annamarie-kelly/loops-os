@@ -64,6 +64,18 @@
           "mode": { "enum": ["build", "design", "communicate", "research", "ops"] }
         }
       }
+    },
+    "repos": {
+      "type": "array",
+      "description": "Codebases you work in. Each entry surfaces in the ClaudeChat repo picker so you can run `claude -p` against the right tree instead of the vault.",
+      "items": {
+        "type": "object",
+        "required": ["name", "path"],
+        "properties": {
+          "name": { "type": "string", "description": "Display name shown in the picker. e.g. 'frontend', 'api', 'infra'." },
+          "path": { "type": "string", "description": "Absolute path to the repo on disk." }
+        }
+      }
     }
   }
 }

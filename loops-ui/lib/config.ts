@@ -18,6 +18,11 @@ export interface StakeholderConfig {
   staleDays: number;
 }
 
+export interface RepoConfig {
+  name: string;
+  path: string;
+}
+
 export interface LoopsConfig {
   vault: {
     scanFolders: string[];
@@ -30,6 +35,10 @@ export interface LoopsConfig {
   priorityCaps: { P1Flat: number; P2Flat: number };
   scannerStakeholders: Array<{ keyword: string; name: string }>;
   subgroupHints: Array<{ match: string; mode: 'build' | 'design' | 'communicate' | 'research' | 'ops' }>;
+  // Codebases the user works in. Surfaces as the ClaudeChat repo
+  // picker so a chat session can run `claude -p` against the right
+  // tree (instead of always defaulting to the vault).
+  repos?: RepoConfig[];
 }
 
 export const config: LoopsConfig = raw as LoopsConfig;
