@@ -21,6 +21,7 @@ export function Header({
   onOpenSearch,
   onOpenBoundaryLog,
   onOpenVaultBrowser,
+  onOpenSystem,
   sortBy,
   onSetSortBy,
   filterPBuckets,
@@ -44,6 +45,7 @@ export function Header({
   onOpenSearch?: () => void;
   onOpenBoundaryLog?: () => void;
   onOpenVaultBrowser?: () => void;
+  onOpenSystem?: () => void;
   sortBy: SortBy;
   onSetSortBy: (s: SortBy) => void;
   filterPBuckets: Set<string>;
@@ -212,6 +214,17 @@ export function Header({
             </button>
           )}
           {/* OverrideBadge removed — boundary log accessible via ⌘⇧B */}
+          {onOpenSystem && (
+            <button
+              type="button"
+              onClick={onOpenSystem}
+              className="w-7 h-7 rounded-lg bg-inset text-ink-soft hover:text-ink flex items-center justify-center text-[12px] transition-colors"
+              title="System (s)"
+              aria-label="Open system panel"
+            >
+              {'⚙'}
+            </button>
+          )}
           <ThemeToggle theme={theme} onChange={changeTheme} />
         </div>
       </div>

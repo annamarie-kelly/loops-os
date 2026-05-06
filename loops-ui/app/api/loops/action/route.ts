@@ -16,7 +16,7 @@ async function readLoops(): Promise<LoopsFile> {
 }
 
 async function writeLoops(data: LoopsFile): Promise<void> {
-  const tmp = `${LOOPS_PATH}.tmp`;
+  const tmp = `${LOOPS_PATH}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(data, null, 2), 'utf-8');
   await fs.rename(tmp, LOOPS_PATH);
 }
@@ -95,7 +95,7 @@ async function mutateSourceFile(
     lines.splice(matchIdx, 1);
   }
 
-  const tmp = `${abs}.tmp`;
+  const tmp = `${abs}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.tmp`;
   await fs.writeFile(tmp, lines.join('\n'), 'utf-8');
   await fs.rename(tmp, abs);
 }

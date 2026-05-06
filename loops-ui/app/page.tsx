@@ -61,6 +61,8 @@ import { VaultBrowser } from '@/components/VaultBrowser';
 import { NoteReader } from '@/components/NoteReader';
 import { CaptureBar } from '@/components/CaptureBar';
 import { FirstLaunchRitual } from '@/components/FirstLaunchRitual';
+import { FirstLaunchTour } from '@/components/FirstLaunchTour';
+import { SystemPanel } from '@/components/SystemPanel';
 import { loadDemoSeed, clearDemoSeed, isDemoLoop } from '@/lib/demo-seed';
 import { appendBoundaryLog } from '@/lib/tend';
 import {
@@ -102,7 +104,12 @@ export default function Page() {
   // Bumping this number after a save/create makes VaultBrowser refetch.
   const [vaultRefreshKey, setVaultRefreshKey] = useState(0);
   const [captureOpen, setCaptureOpen] = useState(false);
+  const [systemPanelOpen, setSystemPanelOpen] = useState(false);
   const [ritualDismissed, setRitualDismissed] = useState(false);
+  const [tourDismissed, setTourDismissed] = useState(() =>
+    typeof window !== 'undefined' &&
+    localStorage.getItem('loops-ui:tour-completed') === '1'
+  );
   const [capacityGate, setCapacityGate] = useState<{
     open: boolean;
     kind: 'P1:stakeholder' | 'P1:self' | 'P1-cap' | 'P2-cap';
@@ -952,6 +959,30 @@ export default function Page() {
         setCaptureOpen(true);
         return;
       }
+      // `s` (no modifiers) toggles the System panel. Suppressed while
+      // any other modal is already up so it doesn't fight a focused
+      // input or a layered overlay.
+      if (
+        !inEditable &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        (e.key === 's' || e.key === 'S')
+      ) {
+        const anotherModalOpen =
+          searchOpen ||
+          adoptOpen ||
+          boundaryPanelOpen ||
+          captureOpen ||
+          claudeChatOpen ||
+          vaultBrowserOpen ||
+          capacityGate.open;
+        if (!anotherModalOpen || systemPanelOpen) {
+          e.preventDefault();
+          setSystemPanelOpen((v) => !v);
+          return;
+        }
+      }
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault();
         setSearchOpen((v) => !v);
@@ -1087,6 +1118,16 @@ export default function Page() {
     saveData,
     clearSelection,
     detailId,
+    // System-panel gating reads these — without them the closure
+    // would see stale modal flags and fight the user's intent.
+    searchOpen,
+    adoptOpen,
+    boundaryPanelOpen,
+    captureOpen,
+    claudeChatOpen,
+    vaultBrowserOpen,
+    capacityGate.open,
+    systemPanelOpen,
   ]);
 
   const weekBlocks = useMemo(() => {
@@ -1160,6 +1201,7 @@ export default function Page() {
           onOpenSearch={() => setSearchOpen(true)}
           onOpenBoundaryLog={() => setBoundaryPanelOpen(true)}
           onOpenVaultBrowser={() => setVaultBrowserOpen(true)}
+          onOpenSystem={() => setSystemPanelOpen(true)}
           sortBy={sortBy}
           onSetSortBy={setSortBy}
           filterPBuckets={filterPBuckets}
@@ -1741,6 +1783,12 @@ export default function Page() {
           onCapture={createLoop}
         />
 
+        {/* System panel — `s` from anywhere or click the cog. */}
+        <SystemPanel
+          open={systemPanelOpen}
+          onClose={() => setSystemPanelOpen(false)}
+        />
+
         {/* First-launch ritual — only when fully empty and unflagged. */}
         {!ritualDismissed && data?.loops.length === 0 && (
           <FirstLaunchRitual
@@ -1751,6 +1799,30 @@ export default function Page() {
               setMode('triage');
             }}
             onSkip={() => setRitualDismissed(true)}
+          />
+        )}
+
+        {/* First-launch tour. Fires whenever there are loops to look at
+            and the tour hasn't been completed. Independent of ritual:
+            users who hit a pre-seeded vault (demo data, or pointed at an
+            existing vault) get the tour even though ritual never fires.
+            When ritual IS rendering, it covers this card visually
+            (z-50 over z-40). */}
+        {!tourDismissed && data && data.loops.length > 0 && (
+          <FirstLaunchTour
+            onSetMode={setMode}
+            onComplete={() => {
+              try {
+                localStorage.setItem('loops-ui:tour-completed', '1');
+                // Tour-as-onboarding: if the user reached the tour
+                // without going through the ritual (because they had
+                // loops on first load), mark them onboarded so the
+                // checkpoint modal/banner gates know this isn't a
+                // fresh-install user anymore.
+                localStorage.setItem('loops-ui:onboarded', '1');
+              } catch {}
+              setTourDismissed(true);
+            }}
           />
         )}
       </div>

@@ -133,7 +133,7 @@ async function reconcileDoneState(
     const lines = cache.get(file);
     if (!lines) continue;
     const abs = path.join(VAULT_ROOT, file);
-    const tmp = `${abs}.tmp`;
+    const tmp = `${abs}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.tmp`;
     try {
       await fs.writeFile(tmp, lines.join('\n'), 'utf-8');
       await fs.rename(tmp, abs);

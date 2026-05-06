@@ -4,6 +4,8 @@ A thinking surface for the loose ends in your head — capture them, sort them, 
 
 Most task tools optimize for ticking boxes. This one optimizes for the moment before that: deciding what's worth a box at all, where it sits relative to everything else, and whether you've been spending your week on the things you said mattered. Everything you do here writes plain markdown to a folder on disk, so you own the data and nothing is locked in.
 
+> **New here?** Read the [complete guide](https://annamarie-kelly.github.io/loops-os/) for the full tour, or skip to the [install](#quick-start) below. Questions live in [Discussions](https://github.com/annamarie-kelly/loops-os/discussions); bugs in [Issues](https://github.com/annamarie-kelly/loops-os/issues).
+
 ## What you do here
 
 - **Focus** — one loop on the screen, everything else hidden. For when you've already decided what to work on.
@@ -38,38 +40,65 @@ capture → Triage (decide) → Backlog (commit) → Plan (schedule) → Focus (
 
 Triage is the **gate**. Backlog is the **garden**. Focus is **right now**. Nothing skips ahead without a decision — that's the whole point.
 
-## Getting started
+## Quick start
 
-You need Node 20+ and a folder you'd like to use as a vault. If you don't have one, the repo ships with `../vault-template/` and the dev server points at it by default.
-
-```bash
-npm install
-```
-
-Edit `loops.config.json` to name your primary stakeholder and set capacity caps (see [Configuration](#configuration) below). Then:
+You need **Node 20+**. Everything else is optional.
 
 ```bash
-npm run dev
-open http://localhost:3456
+curl -fsSL https://raw.githubusercontent.com/annamarie-kelly/loops-os/main/install.sh | bash
 ```
 
-To point at your own vault instead of the bundled template:
+The script is short and readable — [review it on GitHub](https://github.com/annamarie-kelly/loops-os/blob/main/install.sh) before piping if you're cautious. It checks your platform, Node version, and git, clones the repo to `~/loops-os` (override with `LOOPS_OS_DIR=/path`), then hands off to `npm run start`.
+
+That handoff runs preflight checks (Node version, port 3456, Claude Code CLI, Obsidian), installs deps, offers to seed the bundled vault with example loops, starts the dev server, and opens the browser. Ctrl-C to stop.
+
+**Windows users:** the installer doesn't support Windows yet — use the manual path below.
+
+### Or, manually
+
+```bash
+git clone https://github.com/annamarie-kelly/loops-os.git
+cd loops-os/loops-ui
+npm run start
+```
+
+If you have Claude Code installed, you can also run the `/start` slash command from inside Claude Code at the repo root for a guided walkthrough.
+
+### What you'll see on first run
+
+The bundled `vault-template/` ships as the default vault — `LOOPS_UI_VAULT_ROOT` points at it out of the box, so the app boots with seeded demo loops and you can click through Triage, Plan, and Focus immediately. When you're ready to bring your own:
 
 ```bash
 export LOOPS_UI_VAULT_ROOT=/absolute/path/to/your/vault
 ```
 
-If your vault has no `- [ ]` items yet, seed some examples so the UI has something to render:
+See [`.env.example`](./.env.example) for every recognized environment variable. All optional.
+
+### The Chrome capture extension
+
+Capture from any browser tab into your triage inbox with `⌘⇧L`:
+
+1. Open `chrome://extensions` → enable Developer mode
+2. **Load unpacked** → point at `loops-ui/tools/loops-capture-extension/`
+3. Pin the icon. Press `⌘⇧L` from any page.
+
+The extension talks only to localhost. No external endpoints.
+
+### Pointing at an existing vault
+
+If you already have a folder with `- [ ]` items in it:
+
+```bash
+npm run refresh-loops    # scan existing tasks into 06-Loops/loops.json
+```
+
+If your vault is empty, seed examples so the UI has something to render:
 
 ```bash
 npm run seed-loops
 ```
 
-If it already has tasks, scan them in:
-
-```bash
-npm run refresh-loops
-```
+Edit [`loops.config.json`](./loops.config.json) to name your primary stakeholder and set capacity caps (see [Configuration](#configuration) below).
 
 ## On top of an Obsidian vault — but you don't need to open Obsidian
 

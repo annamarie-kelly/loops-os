@@ -63,16 +63,21 @@ export function CheckpointSkipBanner() {
   const completed = !!todayCp?.completed_at && !todayCp.skipped;
 
   // Auto-mark today's skip exactly once per day once the skip hour
-  // passes. Two guards beyond the obvious:
-  //   1. `checkpoint_force_open === today` means the user just hit "Do
+  // passes. Three guards beyond the obvious:
+  //   1. First-run: don't auto-skip (or stack boundary-log entries) until
+  //      the user has completed the FirstLaunchRitual. A stranger cloning
+  //      the repo at 5pm shouldn't have "Checkpoint skipped today" land
+  //      before they've used the app.
+  //   2. `checkpoint_force_open === today` means the user just hit "Do
   //      it now" to reopen the modal. Don't immediately re-skip.
-  //   2. `checkpoint_skip_logged === today` means we already wrote a
+  //   3. `checkpoint_skip_logged === today` means we already wrote a
   //      boundary-log entry for today's skip. Don't stack duplicates.
   useEffect(() => {
     if (!pastSkip) return;
     if (completed) return;
     if (todayCp?.skipped) return;
     try {
+      if (window.localStorage.getItem('loops-ui:onboarded') !== '1') return;
       const forceOpen = window.localStorage.getItem(
         'loops-ui:tend:checkpoint_force_open',
       );
@@ -124,6 +129,18 @@ export function CheckpointSkipBanner() {
 
   const showTodaySkip = pastSkip && !completed && !!todayCp?.skipped;
 
+  // First-run guard: hide the banner entirely until the user has
+  // completed the FirstLaunchRitual. The banner's "Checkpoint skipped
+  // today" framing is meaningless on a fresh install.
+  let onboarded = false;
+  try {
+    onboarded = typeof window !== 'undefined' &&
+      window.localStorage.getItem('loops-ui:onboarded') === '1';
+  } catch {
+    /* non-fatal */
+  }
+
+  if (!onboarded) return null;
   if (!showTodaySkip && !yesterdayBackfillable) return null;
 
   const doItNow = () => {

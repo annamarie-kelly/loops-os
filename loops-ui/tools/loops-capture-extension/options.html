@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="popup.css" />
+    <style>
+      body { width: 420px; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <span class="eyebrow">Loops Capture · Settings</span>
+    </div>
+
+    <label class="label" for="url">Loops UI URL</label>
+    <input id="url" type="text" placeholder="http://localhost:3456" />
+    <p class="hint">
+      Where your loops-ui dev server is running. Defaults to
+      <code>localhost:3456</code>.
+    </p>
+
+    <div class="footer">
+      <button id="save" type="button">Save</button>
+      <span id="status" class="status" aria-live="polite"></span>
+    </div>
+
+    <script src="options.js"></script>
+  </body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="header">
+      <span class="eyebrow">Capture</span>
+      <div class="kind-toggle" role="tablist" aria-label="Save as">
+        <button class="kind-pill" data-kind="loop" type="button">Loop → Triage</button>
+        <button class="kind-pill" data-kind="clip" type="button">Clip → Vault</button>
+      </div>
+    </div>
+
+    <textarea
+      id="note"
+      placeholder="What's loud right now? (⌘↵ to capture)"
+      autofocus
+    ></textarea>
+
+    <div class="pills" id="pills" role="group" aria-label="Tags">
+      <button class="pill" data-tag="task" type="button">task</button>
+      <button class="pill" data-tag="read" type="button">read</button>
+      <button class="pill" data-tag="research" type="button">research</button>
+      <button class="pill" data-tag="idea" type="button">idea</button>
+      <button class="pill" data-tag="design" type="button">design</button>
+      <button
+        class="pill pill-add"
+        id="pill-add"
+        type="button"
+        title="Add a custom tag"
+        aria-label="Add tag"
+      >+</button>
+      <input
+        id="pill-input"
+        class="pill pill-input"
+        type="text"
+        placeholder="tag…"
+        autocomplete="off"
+        hidden
+      />
+    </div>
+
+    <div class="context" id="context" hidden>
+      <div class="context-row">
+        <span class="dot" aria-hidden></span>
+        <div class="context-text">
+          <div id="ctx-title" class="ctx-title"></div>
+          <div id="ctx-url" class="ctx-url"></div>
+        </div>
+        <button id="ctx-remove" type="button" title="Remove page link">
+          ×
+        </button>
+      </div>
+    </div>
+
+    <div class="footer">
+      <button id="capture" type="button">Capture</button>
+      <span id="status" class="status" aria-live="polite"></span>
+      <a id="settings-link" class="settings-link" href="#">settings</a>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

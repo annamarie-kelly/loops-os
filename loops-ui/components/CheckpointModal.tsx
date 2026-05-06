@@ -190,11 +190,24 @@ export function CheckpointModal({
   }, [today]);
 
   // Decide whether to open. Rules:
+  // - First-run guard: don't auto-open until the user has completed the
+  //   FirstLaunchRitual. A stranger cloning the repo at 3:30pm shouldn't
+  //   be greeted by "How did today go?" on a fresh install.
   // - If today's checkpoint exists and is complete (not skipped), don't open.
   // - If forced (user clicked "Do it now" on the skip banner), always
   //   try to acquire the lock regardless of hour.
-  // - Otherwise: auto-open only in the 5pm-6pm window.
+  // - Otherwise: auto-open only in the 3pm-4pm window.
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        if (window.localStorage.getItem('loops-ui:onboarded') !== '1') {
+          if (open) setOpen(false);
+          return;
+        }
+      } catch {
+        /* non-fatal */
+      }
+    }
     const completedToday =
       !!existing && !existing.skipped && !!existing.completed_at;
     if (completedToday) {
@@ -309,6 +322,34 @@ export function CheckpointModal({
     onCompleted?.();
   };
 
+  const skipForNow = () => {
+    // Soft escape hatch. Writes a skipped checkpoint for today, releases
+    // the lock, removes the force flag (so the skip banner can take over
+    // for the rest of the day), and closes. Different from auto-skip:
+    // this is an explicit "not now" gesture, logged for the boundary log.
+    const cp: Checkpoint = {
+      date: today,
+      skipped: true,
+      loops_touched: [],
+      pressure: null,
+      tomorrow_intent: [],
+    };
+    writeCheckpoint(cp);
+    appendBoundaryLog({
+      type: 'checkpoint_skip',
+      context: `User skipped checkpoint via modal on ${today}`,
+    });
+    try {
+      window.localStorage.setItem('loops-ui:tend:checkpoint_skip_logged', today);
+      window.localStorage.removeItem(LS_FORCE_OPEN);
+    } catch {
+      /* non-fatal */
+    }
+    releaseCheckpointLock(tabIdRef.current);
+    setOwnsLock(false);
+    setOpen(false);
+  };
+
   return (
     <div
       role="dialog"
@@ -330,7 +371,7 @@ export function CheckpointModal({
             How did today go?
           </div>
           <div className="text-[11px] text-ink-faint mt-1.5">
-            Required to move on. Three quick sections.
+            Three quick sections. Skip if you're not ready.
           </div>
         </div>
 
@@ -497,17 +538,26 @@ export function CheckpointModal({
         </div>
 
         <div className="px-6 py-3 border-t border-edge-subtle flex items-center justify-between shrink-0">
-          <div className="text-[10px] text-ink-ghost">
-            {canSubmit ? 'Ready' : 'Pick a pressure read above to continue'}
-          </div>
           <button
             type="button"
-            onClick={submit}
-            disabled={!canSubmit}
-            className="text-[12px] text-ink bg-inset hover:bg-[var(--mauve)]/10 hover:text-mauve-text px-4 py-1.5 rounded-md border-[0.5px] border-edge hover:border-[var(--mauve)]/40 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-inset disabled:hover:text-ink disabled:hover:border-edge transition-all"
+            onClick={skipForNow}
+            className="text-[11px] text-ink-ghost hover:text-ink-soft underline-offset-2 hover:underline transition-colors"
           >
-            Done
+            Skip for now
           </button>
+          <div className="flex items-center gap-3">
+            <div className="text-[10px] text-ink-ghost">
+              {canSubmit ? 'Ready' : 'Pick a pressure read above to continue'}
+            </div>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={!canSubmit}
+              className="text-[12px] text-ink bg-inset hover:bg-[var(--mauve)]/10 hover:text-mauve-text px-4 py-1.5 rounded-md border-[0.5px] border-edge hover:border-[var(--mauve)]/40 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-inset disabled:hover:text-ink disabled:hover:border-edge transition-all"
+            >
+              Done
+            </button>
+          </div>
         </div>
       </div>
     </div>

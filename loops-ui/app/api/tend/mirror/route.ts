@@ -21,7 +21,10 @@ const FILE_BY_KIND: Record<string, string> = {
 };
 
 async function atomicWrite(abs: string, body: string): Promise<number> {
-  const tmp = `${abs}.tmp`;
+  // Per-call tmp filename — concurrent writes of the same kind would
+  // otherwise both target `${abs}.tmp` and race the rename, leaving
+  // the loser with ENOENT.
+  const tmp = `${abs}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.tmp`;
   await fs.writeFile(tmp, body, 'utf-8');
   await fs.rename(tmp, abs);
   return Buffer.byteLength(body, 'utf-8');

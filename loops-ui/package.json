@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev -p 3456",
     "build": "next build",
-    "start": "next start -p 3456",
+    "start": "node scripts/start.mjs",
+    "next-start": "next start -p 3456",
     "seed-loops": "node scripts/seed-loops.mjs",
     "refresh-loops": "node --env-file=.env.local scripts/refresh-loops.mjs && node --env-file=.env.local scripts/notes-index.mjs",
     "refresh-loops:dry": "node --env-file=.env.local scripts/refresh-loops.mjs --dry-run",
